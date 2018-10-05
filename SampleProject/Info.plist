@@ -17,39 +17,41 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>17.0</string>
+	<string>17.9</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>fb1899966743571465</string>
+				<string>laybareapp</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>17.0.2</string>
+	<string>17.9</string>
 	<key>FacebookAppID</key>
 	<string>1899966743571465</string>
 	<key>FacebookDisplayName</key>
 	<string>Lay Bare Waxing Salon</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>fbapi</string>
-		<string>fb-messenger-api</string>
+		<string>googlechromes</string>
+		<string>comgooglemaps</string>
+		<string>fbauth</string>
 		<string>fbauth2</string>
-		<string>fbshareextension</string>
+		<string>laybareapp</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Lay Bare PH needs to access your camera</string>
+	<string>Lay Bare PH needs to access your camera so you may upload your profile picture / screenshot</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Lay Bare PH need to access your Current Location</string>
+	<string>Lay Bare PH need to access your current location to find our nearest branch</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Lay Bare PH need to access your Current Location</string>
+	<string>Lay Bare PH need to access your current location to find our nearest branch</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Lay Bare PH needs to access your images/gallery</string>
+	<string>Lay Bare PH needs to access your images/gallery so you may upload your profile picture / screenshot</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>LobsterTwo-Bold.otf</string>

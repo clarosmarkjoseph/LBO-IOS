@@ -8,5 +8,6 @@
 
 
 class ClientManager {
-    static let sharedClient = MSClient(applicationURLString: "Endpoint=sb://laybare-hub.servicebus.windows.net/;SharedAccessKeyName=DefaultFullSharedAccessSignature;SharedAccessKey=57n5ywFMdjQUpZj1sFuL2zBqU0JOoXtCkfpKDjnHsiY=")
+    
+    static let sharedClient = MSClient(applicationURLString: "Endpoint=sb://laybarenamespace.servicebus.windows.net/;SharedAccessKeyName=DefaultListenSharedAccessSignature;SharedAccessKey=wzShMuMA31Vfz48q7A1VHZDBhcK/WHA8qFoL0SUDgFY=")
 }

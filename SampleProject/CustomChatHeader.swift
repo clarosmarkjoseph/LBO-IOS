@@ -7,3 +7,12 @@
 //
 
 import Foundation
+
+class CustomChatHeader:UIStackView{
+    
+    @IBOutlet var lblChatUser: UILabel!
+    @IBOutlet var lblChatActiveAgo: UILabel!
+    @IBOutlet var imgChatProfile: UIImageView!
+    
+    
+}

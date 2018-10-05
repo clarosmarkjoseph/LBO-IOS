@@ -9,7 +9,7 @@
 import UIKit
 
 protocol ProtocolBranch {
-    func setBranch(selectedBranch:String,selectedBranchID:Int,objectBranch:ArrayBranch)
+    func setBranch(selectedBranch:String,selectedBranchID:Int,objectSelectedBranch:ArrayBranch,arrayIndex:Int)
 }
 
 class BranchController: UIViewController,UITableViewDelegate,UITableViewDataSource,UISearchBarDelegate {
@@ -21,7 +21,8 @@ class BranchController: UIViewController,UITableViewDelegate,UITableViewDataSour
     var ifAppointment:Bool?   = nil
     var arrayBranches         = [ArrayBranch]()
     var arrayFilteredBranches = [ArrayBranch]()
-    var isSearching               = false
+    var isSearching           = false
+    var ifLocation            = false
     var delegate: ProtocolBranch? = nil
     
     override func viewDidLoad() {
@@ -30,8 +31,18 @@ class BranchController: UIViewController,UITableViewDelegate,UITableViewDataSour
         tblBranch.dataSource    = self
         searchBar.delegate      = self
         searchBar.returnKeyType = UIReturnKeyType.done
-        loadBranches()
     }
+    
+    
+    override func viewWillLayoutSubviews() {
+        if ifLocation == false{
+            loadBranches()
+        }
+        else{
+           
+        }
+    }
+    
     
     func loadBranches(){
         let branch_tbl = dbclass.branch_tbl
@@ -67,19 +78,43 @@ class BranchController: UIViewController,UITableViewDelegate,UITableViewDataSour
         var branch_name             = ""
         var branch_address          = ""
         
-        if(isSearching == true){
-            branch_name     = arrayFilteredBranches[indexPath.row].branch_name!
-            branch_address  = arrayFilteredBranches[indexPath.row].branch_address!
+        if ifLocation == true{
+            var default_distance = 0.0
+            var default_duration = ""
+            var statementDesc    = ""
+            if(isSearching == true){
+                branch_name         = arrayFilteredBranches[indexPath.row].branch_name!
+                default_distance    = arrayFilteredBranches[indexPath.row].estimated_distance!
+                default_duration    = arrayFilteredBranches[indexPath.row].estimated_travel_time ?? "0 min"
+            }
+            else{
+                branch_name         = arrayBranches[indexPath.row].branch_name!
+                default_distance    = arrayBranches[indexPath.row].estimated_distance!
+                default_duration    = arrayBranches[indexPath.row].estimated_travel_time ?? "0 min"
+            }
+            
+            if default_duration == "0 min"{
+                statementDesc = "\(default_distance) km away from your current location"
+            }
+            else{
+                statementDesc = "\(default_distance) km away from your current location"
+                cell.lblBranchDistance.text     = "Travel Time: \(default_duration)"
+                cell.lblBranchDistance.isHidden = false
+            }
+            cell.lblBranchDesc.text         = statementDesc
         }
         else{
-            branch_name     = arrayBranches[indexPath.row].branch_name!
-            branch_address  = arrayBranches[indexPath.row].branch_address!
+            if(isSearching == true){
+                branch_name     = arrayFilteredBranches[indexPath.row].branch_name!
+                branch_address  = arrayFilteredBranches[indexPath.row].branch_address!
+            }
+            else{
+                branch_name     = arrayBranches[indexPath.row].branch_name!
+                branch_address  = arrayBranches[indexPath.row].branch_address!
+            }
+            cell.lblBranchDesc.text    = branch_address
         }
-        
-        cell.lblBranchName.text    = branch_name
-        cell.lblBranchDesc.text    = branch_address
-     
-        
+        cell.lblBranchName.text     = branch_name
         return cell
         
     }
@@ -98,12 +133,12 @@ class BranchController: UIViewController,UITableViewDelegate,UITableViewDataSour
         if(isSearching == true){
             branch_id   = arrayFilteredBranches[indexPath.row].id!
             branch_name = arrayFilteredBranches[indexPath.row].branch_name!
-            delegate?.setBranch(selectedBranch: branch_name, selectedBranchID: branch_id,objectBranch:arrayFilteredBranches[indexPath.row])
+            delegate?.setBranch(selectedBranch: branch_name, selectedBranchID: branch_id,objectSelectedBranch:arrayFilteredBranches[indexPath.row],arrayIndex: indexPath.row)
         }
         else{
             branch_id   = arrayBranches[indexPath.row].id!
             branch_name = arrayBranches[indexPath.row].branch_name!
-            delegate?.setBranch(selectedBranch: branch_name, selectedBranchID: branch_id,objectBranch:arrayBranches[indexPath.row])
+            delegate?.setBranch(selectedBranch: branch_name, selectedBranchID: branch_id,objectSelectedBranch:arrayBranches[indexPath.row],arrayIndex: indexPath.row)
         }
        
         self.dismiss(animated: true, completion: nil)
@@ -123,10 +158,10 @@ class BranchController: UIViewController,UITableViewDelegate,UITableViewDataSour
         else{
             isSearching = true
             arrayFilteredBranches = arrayBranches.filter({(arrayBranchName:ArrayBranch) -> Bool in
-                if (arrayBranchName.branch_name?.contains(searchBar.text!))!{
+                if (arrayBranchName.branch_name?.lowercased().contains(searchBar.text!.lowercased()))!{
                     return true
                 }
-                if (arrayBranchName.branch_address?.contains(searchBar.text!))!{
+                if (arrayBranchName.branch_address?.lowercased().contains(searchBar.text!.lowercased()))!{
                     return true
                 }
                 else{

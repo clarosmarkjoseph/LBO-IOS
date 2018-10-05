@@ -18,24 +18,40 @@ class ProductSegmentController: UIViewController,UITableViewDelegate,UITableView
     var SERVER_URL  = ""
     var viewType    = ""
     var delegateAppointment:ProtocolAddItem? = nil
+    var arrayProducts       = [Int]()
     
     override func viewDidLoad() {
         tblProduct.delegate      = self
         tblProduct.dataSource    = self
-        SERVER_URL = dbclass.returnIp()
+        SERVER_URL               = dbclass.returnIp()
+        arrayProducts            = GlobalVariables.sharedInstance.getAvailableProducts()
+        print("this is array: \(arrayProducts)")
         loadProduct()
         super.viewDidLoad()
         
     }
 
     func loadProduct() {
+        print("hi \(arrayProducts)")
         self.dialogUtils.showActivityIndicator(self.view)
+        modelProducts = [ArrayProducts]()
         let product_tbl = dbclass.product_tbl
         do{
             if let queryProduct = try dbclass.db?.pluck(product_tbl) {
                 let arrayStringProduct  = queryProduct[dbclass.product_array]
                 let jsonData            = arrayStringProduct.data(using: .utf8)
-                modelProducts           = try JSONDecoder().decode([ArrayProducts].self, from: jsonData!)
+                let arrayResult         = try JSONDecoder().decode([ArrayProducts].self, from: jsonData!)
+                if(arrayProducts.count > 0){
+                    for rowRes in arrayResult{
+                        let id = rowRes.id ?? 0
+                        if(arrayProducts.contains(where: {$0 == id }) == true){
+                            modelProducts.append(rowRes)
+                        }
+                    }
+                }
+                else{
+                     modelProducts  = arrayResult
+                }
             }
             self.dialogUtils.hideActivityIndicator(self.view)
         }
@@ -58,7 +74,7 @@ class ProductSegmentController: UIViewController,UITableViewDelegate,UITableView
         let myURL                       = URL(string:SERVER_URL+"/images/products/\(image)")
         cell.lblServiceName.text        = product_name
         cell.lblServiceDesc.text        = product_desc
-        cell.lblServicePrice.text       = "Php \(product_price)"
+        cell.lblServicePrice.text       = utilities.convertToStringCurrency(value: "\(product_price)")
         cell.imgServicePackage.kf.setImage(with: myURL)
         
         return cell

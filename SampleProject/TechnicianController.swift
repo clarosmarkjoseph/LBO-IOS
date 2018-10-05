@@ -8,7 +8,7 @@
 
 import UIKit
 protocol ProtocolTechnician {
-    func setTechnician(id:Int,techName:String,start_time:String,end_time:String)
+    func setTechnician(id:Int,techName:String,start_time:String,end_time:String,employee_id:String)
 }
 class TechnicianController: UIViewController,UITableViewDelegate,UITableViewDataSource,UISearchBarDelegate {
     
@@ -89,16 +89,18 @@ class TechnicianController: UIViewController,UITableViewDelegate,UITableViewData
         if(isSearching == true){
             technician_id       = arrayFilteredTechnician[indexPath.row].id!
             technician_name     = arrayFilteredTechnician[indexPath.row].name!
+            let employee_id     = arrayFilteredTechnician[indexPath.row].employee_id ?? "0"
             let schedule_start  = arrayFilteredTechnician[indexPath.row].schedule!.start
             let schedule_end    = arrayFilteredTechnician[indexPath.row].schedule!.end
-            delegate?.setTechnician(id: technician_id, techName: technician_name, start_time: schedule_start!, end_time: schedule_end!)
+            delegate?.setTechnician(id: technician_id, techName: technician_name, start_time: schedule_start!, end_time: schedule_end!, employee_id: employee_id)
         }
         else{
             technician_id       = arrayTechnician[indexPath.row].id!
             technician_name     = arrayTechnician[indexPath.row].name!
+            let employee_id     = arrayTechnician[indexPath.row].employee_id ?? "0"
             let schedule_start  = arrayTechnician[indexPath.row].schedule!.start
             let schedule_end    = arrayTechnician[indexPath.row].schedule!.end
-            delegate?.setTechnician(id: technician_id, techName: technician_name, start_time: schedule_start!, end_time: schedule_end!)
+            delegate?.setTechnician(id: technician_id, techName: technician_name, start_time: schedule_start!, end_time: schedule_end!, employee_id: employee_id)
         }
         
         self.dismiss(animated: true, completion: nil)
@@ -118,7 +120,7 @@ class TechnicianController: UIViewController,UITableViewDelegate,UITableViewData
         else{
             isSearching = true
             arrayFilteredTechnician = arrayTechnician.filter({(arrayTechName:ArrayTechnician) -> Bool in
-                if (arrayTechName.name?.contains(searchBar.text!))!{
+                if (arrayTechName.name?.lowercased().contains(searchBar.text!.lowercased()))!{
                     return true
                 }
                 else{

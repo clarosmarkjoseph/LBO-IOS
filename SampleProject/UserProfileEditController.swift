@@ -10,7 +10,7 @@ import UIKit
 import Alamofire
 import SQLite
 
-class UserProfileEditController: UIViewController,ProtocolBranch{
+class UserProfileEditController: UIViewController,UITextFieldDelegate,ProtocolBranch{
    
    
     @IBOutlet var stackview: UIStackView!
@@ -50,8 +50,18 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        SERVER_URL  = dbclass.returnIp()
-        token       = utilities.getUserToken()
+        txtEmail.delegate           = self
+        txtContact.delegate         = self
+        txtAddress.delegate         = self
+        txtBday.delegate            = self
+        txtLastName.delegate        = self
+        txtFirstName.delegate       = self
+        txtMiddleName.delegate      = self
+        txtNewPassword.delegate     = self
+        txtOldPassword.delegate     = self
+        txtConfirmPassword.delegate = self
+        SERVER_URL                  = dbclass.returnIp()
+        token                       = utilities.getUserToken()
         loadDetails()
     }
     
@@ -69,7 +79,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
                 if(indexPosition == 0){
                     
                     stackviewHomebranch.isHidden = false
-                    captionMessage = "Select your home branch below.\n Please choose your preffered Lay Bare home branch."
+                    captionMessage = "Select your home branch below.\nPlease choose your preffered Lay Bare home branch."
                     let clientData          = try objectUserAccount?.user_data ?? "{}"
                     let objectUserData      = utilities.convertJSONStringToData(arrayString: clientData)
                     let objectUserDecoded   = try JSONDecoder().decode(ObjectUserData.self, from: objectUserData)
@@ -82,7 +92,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
                 }
                 else if(indexPosition == 1){
                     stackviewPersonal.isHidden = false
-                    captionMessage = "Personal Details\nPlease provide your personal information to ensure of accuracy of transaction data "
+                    captionMessage = "Your complete personal information will help ensure the accuracy of your transactional data."
                     let clientFname     = try objectUserAccount?.first_name ?? ""
                     let clientMname     = try objectUserAccount?.middle_name ?? ""
                     let clientLname     = try objectUserAccount?.last_name ?? ""
@@ -97,7 +107,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
                     txtLastName.text    = clientLname
                     txtAddress.text     = clientAddress
                     txtContact.text     = clientMobile
-                    txtBday.text        = utilities.getCompleteDateString(stringDate: clientBday)
+                    txtBday.text        = clientBday
                     if(clientGender.lowercased() == "male"){
                         segmentGender.selectedSegmentIndex = 1
                     }
@@ -138,7 +148,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
     
 
     
-    func setBranch(selectedBranch: String, selectedBranchID: Int, objectBranch: ArrayBranch) {
+    func setBranch(selectedBranch: String, selectedBranchID: Int, objectSelectedBranch: ArrayBranch,arrayIndex: Int) {
         client_home_branch = selectedBranchID
         txtHomeBranch.text = selectedBranch
     }
@@ -172,7 +182,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
         myFormatter.dateFormat  = "yyyy-MM-dd"
         let date_selected       = myFormatter.string(from: pickerViewBday.date)
         client_bday             = date_selected
-        txtBday.text            = utilities.getCompleteDateString(stringDate: date_selected)
+        txtBday.text            = client_bday
         self.view.endEditing(true)
     }
     
@@ -201,11 +211,13 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
             }
         }
         if(indexPosition == 1){
+            
             let first_name  = txtFirstName.text!
             let last_name   = txtLastName.text!
             let middle_name = txtMiddleName.text!
             let address     = txtAddress.text!
             let contact     = txtContact.text!
+            client_bday     = txtBday.text!
             
             if(first_name == "" || first_name.isEmpty == true){
                 self.showDialog(title: "Incomplete Details", message: "Please provide your first name",ifExit: false)
@@ -213,6 +225,14 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
             }
             if(last_name == "" || last_name.isEmpty == true){
                 self.showDialog(title: "Incomplete Details", message: "Please provide your last name",ifExit: false)
+                return
+            }
+            if(client_bday == ""){
+                self.showDialog(title: "Incomplete Details", message: "Please provide your birthdate",ifExit: false)
+                return
+            }
+            if(utilities.calculateAge(birthday: client_bday) <= 13){
+                self.showDialog(title: "Underage?", message: "Registration failed, You must be 13 y/o of age above.",ifExit: false)
                 return
             }
             if(address == "" || address.isEmpty == true){
@@ -233,7 +253,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
                     "edit_address":address,
                     "edit_contact":contact,
                     "edit_bday":client_bday,
-                    "edit_gender":client_gender
+                    "edit_gender":client_gender.lowercased()
                 ]
                 updateProfile(requestParams:requestParams, updateUrl: updateUrl)
             }
@@ -244,14 +264,14 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
             let old_password        = txtOldPassword.text!
             let new_password        = txtNewPassword.text!
             let confirm_password    = txtConfirmPassword.text!
-            if(email == "" || email.isEmpty == true){
-                self.showDialog(title: "Incomplete Details!", message: "Please provide your email address",ifExit: false)
-                return
-            }
-            if(utilities.isValidEmail(testStr: email)){
-                self.showDialog(title: "Invalid Email!", message: "Please provide your valid email address",ifExit: false)
-                return
-            }
+//            if(email == "" || email.isEmpty == true){
+//                self.showDialog(title: "Incomplete Details!", message: "Please provide your email address",ifExit: false)
+//                return
+//            }
+//            if(utilities.isValidEmail(testStr: email)){
+//                self.showDialog(title: "Invalid Email!", message: "Please provide your valid email address",ifExit: false)
+//                return
+//            }
             if(new_password.count < 10){
                 self.showDialog(title: "Password too short!", message: "Please provide atleast 10 alphanumeric password.",ifExit: false)
                 return
@@ -285,8 +305,11 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
             .responseJSON { response in
                 do{
                     self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode   = try response.response?.statusCode else { return }
-                    let responseError    = response.error?.localizedDescription
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again", ifExit: false)
+                        return
+                    }
                     
                     if let responseJSON = response.result.value{
                         var objectResponse            = responseJSON as! Dictionary<String,Any>
@@ -294,6 +317,15 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
                         if(statusCode == 200 || statusCode == 201){
                            //success
                             self.updateLocalProfile()
+                        }
+                        else if(statusCode == 401){
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            self.utilities.deleteAllData()
+                            let mainStoryboard: UIStoryboard = UIStoryboard(name: "LoginStoryboard", bundle: nil)
+                            let viewController = mainStoryboard.instantiateViewController(withIdentifier: "LoginController") as! LoginController
+                            viewController.isLoggedOut      = true
+                            viewController.sessionExpired   = true
+                            UIApplication.shared.keyWindow?.rootViewController = viewController
                         }
                         else{
                             let responseValue = response.result.value
@@ -365,6 +397,7 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
                 objectUserAccount?.username         = username
                 objectUserAccount?.user_address     = txtAddress.text!
                 objectUserAccount?.user_mobile      = txtContact.text!
+                objectUserAccount?.birth_date       = client_bday
                 let jsonResultEncoded               = try JSONEncoder().encode(objectUserAccount)
                 let jsonResultString                = String(data: jsonResultEncoded, encoding: .utf8)!
                 dbclass.updateUserProfile(id: id!, name: username,token: utilities.getUserToken(), object_data: jsonResultString, date_updated: self.utilities.getCurrentDateTime(ifDateOrTime: "datetime"))
@@ -380,7 +413,17 @@ class UserProfileEditController: UIViewController,ProtocolBranch{
         }
     }
     
-  
+    //textfield ontouch anywhere to hide keyboard
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+
+    
     
     
     

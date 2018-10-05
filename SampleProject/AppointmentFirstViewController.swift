@@ -15,9 +15,8 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
     
     var arrayTitle  = ["Date of Appointment","Branch","Technician","Appointment Time","Promo Code"]
     var arrayValue  = ["Select Date","Select Branch","Select Technician","Select Time","Enter Promo Code"]
-    var arrayImages = ["a_calendar","a_location","a_home","a_clock","a_promo"]
-    
-    let footerMsg           = "PS: if you booked an appointment within current date, we will automatically add 2 hours from current time to ensure the slot of other clients who booked earlier"
+    var arrayImages = ["a_calendar","a_location","a_tech","a_clock","a_promocode"]
+    let footerMsg           = "Note: Same day bookings will be alloted a 2-hour advance lead time for proper appointment slot allocation."
     var branch_id           = 0
     var technician_id       = 0
     let transaction_type    = "branch_booking"
@@ -48,7 +47,6 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
         formatter.locale        = Calendar.current.locale
         return formatter
     }()
-    
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -57,7 +55,6 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
         tblAppointment.delegate     = self
         tblAppointment.dataSource   = self
         SERVER_URL = dbclass.returnIp()
-        setupFooter()
         loadPickerDate()
     }
    
@@ -70,6 +67,12 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
             dateSelected                = utilities.convertStringToDate(stringDate: app_reserved)
             let completeDateMonthString = dateFormatter.string(from: dateSelected)
             arrayValue[0]               = completeDateMonthString
+            
+            if(branch_id > 0){
+                arrayValue[1].append(branch_name)
+                getSchedules()
+            }
+            
             tblAppointment.reloadData()
         }
     }
@@ -101,7 +104,6 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
         if let index = self.tblAppointment.indexPathForSelectedRow{
             self.tblAppointment.deselectRow(at: index, animated: true)
         }
-        
         if(position == 0){
             showDateDialog()
         }
@@ -152,10 +154,10 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
         }
     }
     
-    func setBranch(selectedBranch: String, selectedBranchID: Int,objectBranch:ArrayBranch) {
+    func setBranch(selectedBranch: String, selectedBranchID: Int,objectSelectedBranch:ArrayBranch,arrayIndex: Int) {
         branch_id           = selectedBranchID
         branch_name         = selectedBranch
-        self.objectBranch   = objectBranch
+        self.objectBranch   = objectSelectedBranch
         setLabels(type: "branch")
         getSchedules()
     }
@@ -174,7 +176,58 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
             present(viewController!, animated: true,completion: nil)
         }
     }
-    func setTechnician(id:Int,techName:String,start_time:String,end_time:String){
+    
+    func setTechnician(id:Int,techName:String,start_time:String,end_time:String,employee_id:String){
+        
+        let branch_classification = objectBranch?.branch_classification ?? "company-owned"
+        var url = ""
+        if(branch_classification == "franchised"){
+            url = "https://emsf.lay-bare.com/api/getTechnicianAttendance/\(employee_id)/\(app_reserved)"
+        }
+        else{
+            url = "https://ems.lay-bare.com/api/getTechnicianAttendance/\(employee_id)/\(app_reserved)"
+        }
+        dialogUtil.showActivityIndicator(self.view)
+        Alamofire.request(url, method: .get)
+            .responseJSON { response in
+                do{
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                        return
+                    }
+                    if(statusCode == 200 || statusCode == 201){
+                        if let responseJSONData = response.data{
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            let responseDecoded   = try JSONDecoder().decode(GetTechnicianRequest.self, from: responseJSONData)
+                            let arrayLeave = responseDecoded.leave!
+                            if(arrayLeave.count > 0){
+                                for rows in arrayLeave{
+                                    let status = rows.request_data?.status!
+                                    if(status == "approved"){
+                                        self.showDialog(title: "Technician not available!", message: "Sorry, the technician that you've selected is not available. Please choose other technician.")
+                                        return
+                                    }
+                                }
+                            }
+                            self.setTechnicianSchedule(id: id, techName: techName, start_time: start_time, end_time: end_time, employee_id: employee_id)
+                        }
+                        else{
+                            self.setTechnicianSchedule(id: id, techName: techName, start_time: start_time, end_time: end_time, employee_id: employee_id)
+                        }
+                    }
+                    else{
+                        self.setTechnicianSchedule(id: id, techName: techName, start_time: start_time, end_time: end_time, employee_id: employee_id)
+                    }
+                }
+                catch{
+                    print("ERROR NA: \(error)")
+                    self.setTechnicianSchedule(id: id, techName: techName, start_time: start_time, end_time: end_time, employee_id: employee_id)
+                }
+        }
+    }
+    
+    func setTechnicianSchedule(id:Int,techName:String,start_time:String,end_time:String,employee_id:String){
         technician_id                    = id
         technician_name                  = techName
         objectTechSchedule["start_time"] = start_time
@@ -184,7 +237,7 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
     }
     
     func showTime(){
-        if(branch_id == 0 || branch_id == nil){
+        if(branch_id == 0){
             self.showDialog(title: "Incomplete Details!", message: "Please provide your Branch or Technician before selecting the time of your appointment")
             return
         }
@@ -195,16 +248,17 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
             if(objectTechSchedule.count > 0){
                 start_time  = objectTechSchedule["start_time"] as! String
                 end_time    = objectTechSchedule["end_time"] as! String
+                print("start tech: \(start_time) - \(end_time)")
             }
             else{
                 start_time  = objectBranchSchedule["start_time"] as! String
                 end_time    = objectBranchSchedule["end_time"] as! String
             }
-            
             let viewController = UIStoryboard(name: "DialogStoryboard", bundle: nil).instantiateViewController(withIdentifier: "TimeDialogController") as? TimeDialogController
             viewController?.selected_date   = app_reserved
             viewController?.start_time      = start_time
             viewController?.end_time        = end_time
+            viewController?.hasTech         = true
             viewController?.delegateTime    = self
             viewController?.modalTransitionStyle = .crossDissolve
             viewController?.popoverPresentationController?.sourceView = view
@@ -255,14 +309,17 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
     func getSchedules(){
         
         dialogUtil.showActivityIndicator(self.view)
-        let schedUrl = SERVER_URL+"/api/mobile/getBranchSchedules/\(branch_id)/\(app_reserved)"
+        let schedUrl = "https://lbo.lay-bare.com/api/mobile/getBranchSchedules/\(branch_id)/\(app_reserved)"
         Alamofire.request(schedUrl, method: .get)
             .responseJSON { response in
                 do{
-                    self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode    = try response.response?.statusCode else { return }
-                    let responseError       = response.error?.localizedDescription
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                        return
+                    }
                     if let responseJSONData = response.data{
+                        self.dialogUtil.hideActivityIndicator(self.view)
                         if(statusCode == 200 || statusCode == 201){
                             self.responseSchedules   = try JSONDecoder().decode(IterateBranchSchedule.self, from: responseJSONData)
                             let resultBranchSched   = self.responseSchedules?.branch!
@@ -280,6 +337,7 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
                         }
                     }
                     else{
+                        self.dialogUtil.hideActivityIndicator(self.view)
                         self.branch_id   = 0
                         self.branch_name = ""
                         self.setLabels(type: "branch")
@@ -295,8 +353,6 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
                     self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
                 }
         }
-        
-        
     }
     
     
@@ -362,6 +418,8 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
         }
             
         else{
+            print("Date selected: \(utilities.convertDateTimeToString(date: dateSelected))")
+            
             var objectAppointmentBranch = Dictionary<String,Any>()
             objectAppointmentBranch["value"] = branch_id
             objectAppointmentBranch["label"] = branch_name
@@ -387,29 +445,62 @@ class AppointmentFirstViewController: UIViewController,UITableViewDelegate,UITab
             let appointmentVC  = storyBoard.instantiateViewController(withIdentifier: "AppointmentSecondViewController") as! AppointmentSecondViewController
             appointmentVC.objectAppointment  = self.objectAppointment
             appointmentVC.appointmentQueuing = appointmentQueuing
-            appointmentVC.rooms_count        = (objectBranch?.rooms_count!)!
+            appointmentVC.rooms_count        = objectBranch?.rooms_count ?? 0
+            appointmentVC.selectedDateTime   = dateSelected
+            
+//            appointmentVC.arrayServices      = objectBranch?.services ?? [Int]()
+//            appointmentVC.arrayProducts      = objectBranch?.products ?? [Int]()
+            
+            GlobalVariables.sharedInstance.setAvailableServices(array: objectBranch?.services ?? [Int]())
+            GlobalVariables.sharedInstance.setAvailableProducts(array: objectBranch?.products ?? [Int]())
+            
+            var startBranch = Date()
+            var endBranch   = Date()
+            if(objectTechSchedule.count > 0){
+                startBranch  = utilities.convertStringToDateTime(stringDate: "\(app_reserved) \(objectTechSchedule["start_time"] as! String):00")
+                endBranch    = utilities.convertStringToDateTime(stringDate: "\(app_reserved) \(objectTechSchedule["end_time"] as! String):00")
+            }
+            else{
+                startBranch  = utilities.convertStringToDateTime(stringDate: "\(app_reserved) \(objectBranchSchedule["start_time"] as! String):00")
+                endBranch    = utilities.convertStringToDateTime(stringDate: "\(app_reserved) \(objectBranchSchedule["end_time"] as! String):00")
+            }
+            print("start tech: \(utilities.convertDateTimeToString(date: startBranch)) - \(utilities.convertDateTimeToString(date: endBranch))")
+            appointmentVC.branchStart        = dateSelected
+            appointmentVC.branchStart        = startBranch
+            appointmentVC.branchEnd          = endBranch
             self.navigationController?.pushViewController(appointmentVC, animated: true)
         }
         
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 100
+        return 90
     }
     
-    func setupFooter(){
-        let headerView: UIView = UIView.init(frame: CGRect(x: 0, y: 0, width: self.tblAppointment.frame.width, height: 100))
-        let lblFooter: UILabel = UILabel.init(frame: CGRect(x: 0, y: 0, width: self.tblAppointment.frame.width, height: 100))
-        lblFooter.text = footerMsg
-        lblFooter.textAlignment = .left
-        lblFooter.text          = footerMsg
-        lblFooter.numberOfLines = 0
-        lblFooter.textColor     = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
-        lblFooter.font          = UIFont.italicSystemFont(ofSize: 14)
-        headerView.addSubview(lblFooter)
-        self.tblAppointment.tableFooterView = headerView
-        
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return footerMsg
     }
+
+    
+    func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
+        (view as? UITableViewHeaderFooterView)?.textLabel?.textColor = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+    }
+    
+    
+    
+//    func setupFooter(){
+//        let headerView: UIView = UIView.init(frame: CGRect(x: 0, y: 0, width: self.tblAppointment.frame.width, height: 100))
+//        let lblFooter: UILabel = UILabel.init(frame: CGRect(x: 0, y: 0, width: self.tblAppointment.frame.width, height: 100))
+//        lblFooter.text = footerMsg
+//        lblFooter.textAlignment = .left
+//        lblFooter.text          = footerMsg
+//        lblFooter.numberOfLines = 0
+//        lblFooter.textColor     = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+//        lblFooter.font          = UIFont.italicSystemFont(ofSize: 14)
+//        headerView.addSubview(lblFooter)
+//        self.tblAppointment.tableFooterView = headerView
+//
+//    }
     
     
    

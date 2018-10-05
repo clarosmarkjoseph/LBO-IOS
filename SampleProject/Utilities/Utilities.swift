@@ -10,7 +10,7 @@ import Foundation
 import SQLite
 import Alamofire
 import Kingfisher
-
+import CoreLocation
 
 public class Utilities{
     
@@ -18,12 +18,11 @@ public class Utilities{
     
     func getUserObjectData() -> String{
         
-        var objectUser:ObjectUserAccount
         let user_tbl            = dbclass.user_tbl
-        var userAddress:String    = "{}"
+        let userAddress:String    = "{}"
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 return stringObject
             }
             else{
@@ -39,7 +38,7 @@ public class Utilities{
     func getUserToken() -> String{
         
         let user_tbl     = dbclass.user_tbl
-        var token:String = ""
+        let token:String = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
                 return queryUser[dbclass.user_token]
@@ -55,7 +54,7 @@ public class Utilities{
     func getUserID() -> Int{
         
         let user_tbl     = dbclass.user_tbl
-        var user:Int     = 0
+        let user:Int     = 0
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
                return queryUser[dbclass.user_id]
@@ -73,7 +72,7 @@ public class Utilities{
     func getUserName() -> String{
         
         let user_tbl            = dbclass.user_tbl
-        var userName:String     = ""
+        let userName:String     = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
                return queryUser[dbclass.user_name]
@@ -95,7 +94,7 @@ public class Utilities{
         var userImage:String    = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
                 userImage               = objectUser.user_picture!
@@ -118,14 +117,14 @@ public class Utilities{
         let user_tbl            = dbclass.user_tbl
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
                 
-                let clientData          = try objectUser.user_data ?? "{}"
-                let objectUserData      = convertJSONStringToData(arrayString: clientData)
+                let clientData              = objectUser.user_data ?? "{}"
+                let objectUserData          = convertJSONStringToData(arrayString: clientData)
                 let objectUserDecoded       = try JSONDecoder().decode(ObjectUserData.self, from: objectUserData)
-                let clientPremiereStatus    = try objectUserDecoded.premier_status ?? 0
+                let clientPremiereStatus    = objectUserDecoded.premier_status ?? 0
                 if(clientPremiereStatus <= 0){
                     return false
                 }
@@ -149,14 +148,16 @@ public class Utilities{
         let user_tbl            = dbclass.user_tbl
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
                 
-                let clientData                  = try objectUser.user_data ?? "{}"
+                let clientData                  = objectUser.user_data ?? "{}"
                 let objectUserData              = convertJSONStringToData(arrayString: clientData)
                 let objectUserDecoded           = try JSONDecoder().decode(ObjectUserData.self, from: objectUserData)
-                return try objectUserDecoded.premier_branch ?? 0
+                let premiere                    = getNumberValueInString(stringValue: "\(objectUserDecoded.premier_branch)")
+                let idPremiere                  = Int(premiere) ?? 0
+                return  idPremiere
             }
             else{
                 return 0
@@ -174,11 +175,11 @@ public class Utilities{
         let user_tbl            = dbclass.user_tbl
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
                 
-                let clientData          = try objectUser.user_data ?? "{}"
+                let clientData          = objectUser.user_data ?? "{}"
                 let objectUserData      = convertJSONStringToData(arrayString: clientData)
                 let objectUserDecoded   = try JSONDecoder().decode(ObjectUserData.self, from: objectUserData)
                 let clientHomebranch    = objectUserDecoded.home_branch ?? 0
@@ -201,11 +202,11 @@ public class Utilities{
         let user_tbl            = dbclass.user_tbl
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
                 
-                let clientData          = try objectUser.user_data ?? "{}"
+                let clientData          = objectUser.user_data ?? "{}"
                 let objectUserData      = convertJSONStringToData(arrayString: clientData)
                 let objectUserDecoded   = try JSONDecoder().decode(ObjectUserData.self, from: objectUserData)
                 let clientBossID        = objectUserDecoded.boss_id ?? "0"
@@ -227,13 +228,13 @@ public class Utilities{
         
         var objectUser:ObjectUserAccount
         let user_tbl            = dbclass.user_tbl
-        var userGender:String?  = nil
+        var userGender:String?  = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
-                userGender = objectUser.gender!
+                userGender              = objectUser.gender ?? "female"
                 return userGender!
             }
             else{
@@ -252,10 +253,10 @@ public class Utilities{
         var userEmail:String    = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
-                userEmail = objectUser.email!
+                userEmail = objectUser.email ?? ""
                 print("User Image: \(userEmail)")
                 return userEmail
             }
@@ -276,10 +277,10 @@ public class Utilities{
         var userAddress:String    = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
-                userAddress             = objectUser.user_address!
+                userAddress             = objectUser.user_address ?? "-"
                 return userAddress
             }
             else{
@@ -299,10 +300,10 @@ public class Utilities{
         var userAddress:String    = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
-                userAddress             = objectUser.user_mobile!
+                userAddress             = objectUser.user_mobile ?? "-"
                 return userAddress
             }
             else{
@@ -322,10 +323,10 @@ public class Utilities{
         var userAddress:String    = ""
         do{
             if let queryUser   = try dbclass.db?.pluck(user_tbl){
-                var stringObject        = queryUser[dbclass.user_object_data]
+                let stringObject        = queryUser[dbclass.user_object_data]
                 let jsonData            = stringObject.data(using: .utf8)
                 objectUser              = try JSONDecoder().decode(ObjectUserAccount.self, from: jsonData!)
-                userAddress             = objectUser.birth_date!
+                userAddress             = objectUser.birth_date ?? "0000-00-00"
                 return userAddress
             }
             else{
@@ -341,7 +342,7 @@ public class Utilities{
     
     //get the versions of details
     func getBranchVersion() -> Double{
-        var branch_tbl = dbclass.branch_tbl
+        let branch_tbl = dbclass.branch_tbl
         do{
             if let queryBranch = try dbclass.db?.pluck(branch_tbl){
                 return queryBranch[dbclass.branch_version]
@@ -435,13 +436,13 @@ public class Utilities{
     
     func convertDictionaryToJSONString(dictionaryVal:Dictionary<String, Any>) ->String{
         let jsonData            = try? JSONSerialization.data(withJSONObject: dictionaryVal, options: [])
-        guard let jsonString    = try String(data: jsonData!, encoding: .utf8) else { return "" }
+        guard let jsonString    = String(data: jsonData!, encoding: .utf8) else { return "" }
         return jsonString
     }
     
     func convertJSONArrayToString(objectParse:[Dictionary<String, Any>]) ->String{
         let jsonData            = try? JSONSerialization.data(withJSONObject: objectParse, options: [])
-        guard let jsonString    = try String(data: jsonData!, encoding: .utf8) else { return "" }
+        guard let jsonString    = String(data: jsonData!, encoding: .utf8) else { return "" }
         return jsonString
     }
  
@@ -601,7 +602,7 @@ public class Utilities{
             arrayList.append("Sorry, we would like to inform you that your session is expired(Logged-out from other device)")
         }
         else{
-            if(objectResponseError != nil){
+            if(objectResponseError.count > 0){
                 if let arrayResponse =  objectResponseError["error"] as? NSArray {
                     var response = "An error occurred. Please fix the following: \r\n"
                     for row in arrayResponse{
@@ -663,7 +664,6 @@ public class Utilities{
     
     func getDayOfWeek(dateSelected:Date) -> Int{
         let weekday = Calendar.current.component(.weekday, from: dateSelected)
-        print("day of week: \(weekday - 1)")
         return weekday - 1
     }
     
@@ -672,10 +672,14 @@ public class Utilities{
         dateFormatter.dateFormat    = "yyyy-MM-dd" //Your date format
         dateFormatter.timeZone      = Calendar.current.timeZone //Current time zone
         let date                    = Date()
-        let calendar                = Calendar.current
-
+        
         if(ifDateOrTime == "datetime"){
             dateFormatter.dateFormat    = "yyyy-MM-dd HH:mm"
+            let newDate = dateFormatter.string(from: date)
+            return newDate
+        }
+        if(ifDateOrTime == "datetimeseconds"){
+            dateFormatter.dateFormat    = "yyyy-MM-dd HH:mm:ss"
             let newDate = dateFormatter.string(from: date)
             return newDate
         }
@@ -783,7 +787,7 @@ public class Utilities{
     
     func showToast(message : String,view:UIView) {
         
-        let toastLabel = UILabel(frame: CGRect(x: view.frame.size.width/2 - 75, y: view.frame.size.height-100, width: 150, height: 35))
+        let toastLabel = UILabel(frame: CGRect(x: view.frame.size.width/2 - 75, y: view.frame.size.height-100, width: 250, height: 35))
         toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
         toastLabel.textColor = UIColor.white
         toastLabel.textAlignment = .center;
@@ -792,6 +796,7 @@ public class Utilities{
         toastLabel.alpha = 1.0
         toastLabel.layer.cornerRadius = 10;
         toastLabel.clipsToBounds  =  true
+        toastLabel.numberOfLines  = 0
         view.addSubview(toastLabel)
         UIView.animate(withDuration: 5.0, delay: 0.1, options: .curveEaseIn, animations: {
             toastLabel.alpha = 0.0
@@ -802,13 +807,13 @@ public class Utilities{
     
     func getPLCCaption(index:Int) -> String{
        
-        let data_caption = ["Sorry, based on your record, your current total transaction doesn't reach the limit of application. To qualify for a Premier Loyalty Card, you must have accumulated a minimum of Php 5,000.00 of services availed. Feel free to email us or message us below to review your previous transaction",
+        let data_caption = ["Sorry, Based on our current system records, your transaction total doesn't meet the minimum qualified amount (Php 5,000.00). You may request us to review your transactions by clicking the button below.",
         "With your current transaction that greater than Php 5,000.00, you are now qualified to Premier Loyalty Card Application. Just Click the button below to apply digitally.",
         "Congratulations! Your application is approved! Please wait for the application to be process.\nExpect 2-3 weeks of waiting time before you can get your PLC Card",
         "Your application is currently on process. Expect 2-3 weeks of waiting time before you can get your PLC Card",
         "Your card is deployed and currently delivering to it's respective branch so you can pick it up. We will email you once the card is ready to pick-up.\nThank you for waiting.",
         "Your card is ready and you may pick-up your card in the branch that you selected. Please mark your card as 'Picked-up' once you've received the card. \n Thank your for waiting.",
-        "You already picked-up your card. Enjoy 20% discounts to all Lay Bare branches and the perks and discounts to our partners found in our website (https://lay-bare.com/plc-corner/). Feel free to request a replacement if you lost your card",
+        "You already picked-up your card. Enjoy 10% discounts to all Lay Bare branches and the perks and discounts to our partners found in our Website. Feel free to request a replacement if you lost your card",
         "Your previous application is denied! \nReason:"]
         return data_caption[index];
         
@@ -833,20 +838,237 @@ public class Utilities{
         return returnStatment
     }
     
-//    func convertStringToJSON(stringJSON:String) -> JSONSerialization{
-//        let data = stringJSON.data(using: .utf8)!
+    func returnGoogleAPIKey() -> String{
+       return "AIzaSyDbIhpwNxlOyxl5MKnBczkl4b2s7RXp1Vs"
+    }
+    
+    func getDistanceOfLocation(currentLat:Double,currentLng:Double,destinationLat:Double,destinationLng:Double) -> Double{
+        let currentLocation     = CLLocation(latitude: currentLat, longitude: currentLng)
+        let destinationLocation = CLLocation(latitude: destinationLat, longitude: destinationLng)
+        let distanceInMeters    = currentLocation.distance(from: destinationLocation)
+        let distanceKM          = distanceInMeters / 1000
+        let distanceRounded     = Double(String(format: "%.2f", distanceKM)) ?? 0.0
+        return distanceRounded
+        
+    }
+    
+    func openFacebookPage(){
+        let fbAppUrl = URL(string: "fb://page/?id=7037766039")
+        let fbWebUrl = URL(string: "https://www.facebook.com/OfficialLayBare/")
+        let openURL =  UIApplication.shared.canOpenURL(fbAppUrl!)
+        if(UIApplication.shared.openURL(fbAppUrl!)){
+            UIApplication.shared.openURL(fbAppUrl!)
+        }
+        else{
+            UIApplication.shared.openURL(fbWebUrl!)
+        }
+    }
+    
+    func convertDistanceToString(distance:Double) -> String{
+        let distanceInKM:Double = distance / 1000.0
+        return String(format: "%.2f", distanceInKM)
+    }
+    
+    func convertStringToDouble(stringValue:String) -> Double{
+        var value   = 0.0
+        value       = (stringValue as NSString).doubleValue
+        return value
+    }
+    
+    func convertStringToInt(stringValue:String) -> Int{
+        var value   = 0
+        value       = (stringValue as NSString).integerValue
+        return value
+    }
+    
+    
+    func compressImage(image:UIImage) -> Data {
+        // Reducing file size to a 10th
+        
+        var actualHeight : CGFloat = image.size.height
+        var actualWidth : CGFloat = image.size.width
+        let maxHeight : CGFloat = 1136.0
+        let maxWidth : CGFloat = 640.0
+        var imgRatio : CGFloat = actualWidth/actualHeight
+        let maxRatio : CGFloat = maxWidth/maxHeight
+        var compressionQuality : CGFloat = 0.5
+        
+        if (actualHeight > maxHeight || actualWidth > maxWidth){
+            if(imgRatio < maxRatio){
+                //adjust width according to maxHeight
+                imgRatio = maxHeight / actualHeight;
+                actualWidth = imgRatio * actualWidth;
+                actualHeight = maxHeight;
+            }
+            else if(imgRatio > maxRatio){
+                //adjust height according to maxWidth
+                imgRatio = maxWidth / actualWidth;
+                actualHeight = imgRatio * actualHeight;
+                actualWidth = maxWidth;
+            }
+            else{
+                actualHeight = maxHeight;
+                actualWidth = maxWidth;
+                compressionQuality = 1;
+            }
+        }
+        
+        var rect =  CGRect(x: 0.0, y: 0.0, width: actualWidth, height: actualHeight)
+        UIGraphicsBeginImageContext(rect.size);
+        image.draw(in: rect)
+        var img = UIGraphicsGetImageFromCurrentImageContext();
+        let imageData = UIImageJPEGRepresentation(img!, compressionQuality);
+        UIGraphicsEndImageContext();
+        
+        return imageData!
+    }
+    
+    func convertImageviewToBase64String(imgView:UIImage) -> String{
+       
+        let imageData:Data      = UIImageJPEGRepresentation(imgView,0.4) as! Data
+        let strBase64           = imageData.base64EncodedString(options: .lineLength64Characters)
+        print("Image size: \(imageData)")
+        return " data:image/jpeg;base64,\(strBase64)"
+    }
+    
+    //get time ago (String)
+    func getTimeAgo(dateSet:Date,ifSpecific:Bool) -> String {
+        
+        let calendar    = Calendar.current
+        let currentDate = Date()
+        
+        let dateStart   = calendar.startOfDay(for: dateSet)
+        let dateEnd     = calendar.startOfDay(for: currentDate)
+        
+        let unitFlags: Set<Calendar.Component> = [.minute, .hour, .day, .weekOfYear, .month, .year, .second]
+        let components              = calendar.dateComponents(unitFlags, from: dateSet, to:  currentDate)
+        
+        let componentDateSet        = calendar.dateComponents(unitFlags, from: dateStart)
+        let componentDateCurrent    = calendar.dateComponents(unitFlags, from: dateEnd)
+        
+        let dateFormatter           = DateFormatter()
+        dateFormatter.dateFormat    = "yyyy-MM-dd"
+        let stringCurrentDate       = dateFormatter.string(from: currentDate)
+        let stringtDateParams       = dateFormatter.string(from: dateSet)
+        if(componentDateSet.year == componentDateCurrent.year){
+            
+            if(stringCurrentDate == stringtDateParams){
+                if components.minute! <= 5{
+                    if (ifSpecific == true){
+                        let dateFormatter        = DateFormatter()
+                        dateFormatter.dateFormat = "hh:mm a"
+                        let returnValue          = dateFormatter.string(from:dateSet)
+                        return returnValue
+                    }
+                    else{
+                        return "now"
+                    }
+                }
+                else{
+                    let dateFormatter        = DateFormatter()
+                    dateFormatter.dateFormat = "hh:mm a"
+                    let returnValue          = dateFormatter.string(from:dateSet)
+                    return returnValue
+                }
+            }
+            
+            else if components.month! >= 1{
+                let dateFormatter        = DateFormatter()
+                if (ifSpecific == true){
+                    dateFormatter.dateFormat = "MMMM dd hh:mm a"
+                }
+                else{
+                    dateFormatter.dateFormat = "MMMM dd"
+                }
+                let returnValue = dateFormatter.string(from:dateSet)
+                return returnValue
+            }
+            else {
+                if components.day! >= 7{
+                    let dateFormatter        = DateFormatter()
+                    if (ifSpecific == true){
+                        dateFormatter.dateFormat = "MMMM dd, hh:mm a"
+                    }
+                    else{
+                        dateFormatter.dateFormat = "MMMM dd"
+                    }
+                    let returnValue = dateFormatter.string(from:dateSet)
+                    return returnValue
+                }
+                else{
+                    let dateFormatter        = DateFormatter()
+                    if (ifSpecific == true){
+                        dateFormatter.dateFormat = "EE, hh:mm a"
+                    }
+                    else{
+                        dateFormatter.dateFormat = "EE"
+                    }
+                    let returnValue = dateFormatter.string(from:dateSet)
+                    return returnValue
+                }
+                
+            }
+        }
+        else{
+            let dateFormatter        = DateFormatter()
+            if (ifSpecific == true){
+                dateFormatter.dateFormat = "MM/dd/yyyy hh:mm a"
+            }
+            else{
+                dateFormatter.dateFormat = "MM/dd/yyyy"
+            }
+            let returnValue = dateFormatter.string(from:dateSet)
+            return returnValue
+        }
+    }
+    
+    
+    func deleteAllData(){
+        
+        dbclass.deletePremiere()
+        dbclass.deleteChatThread()
+        dbclass.deleteChatMessage()
+        dbclass.deleteTransactionRequest()
+        dbclass.deleteUserAccount()
+        dbclass.deleteAppointments()
+        dbclass.deletePremier()
+        dbclass.deleteBranchRating()
+        
+    }
+    
+//    func stringFromHtml(string: String) -> NSAttributedString? {
 //        do {
-//            if let jsonArray = try JSONSerialization.jsonObject(with: data, options : .allowFragments) as? [Dictionary<String,Any>]{
-//                return jsonArray
+//            let data = string.data(using: String.Encoding.utf8, allowLossyConversion: true)
+//            if let d = data {
+//                let attrStr     = try? NSAttributedString( // do catch
+//                                data: data!,
+//                                options: [NSAttributedString.DocumentReadingOptionKey.documentType: NSAttributedString.DocumentType.html],
+//                                documentAttributes: nil
+//                            )
+//                return attrStr
 //            }
-//            else {
-//                print("bad json")
-//            }
+//        } catch {
+//            
 //        }
-//        catch let error as NSError {
-//            print(error)
-//        }
+//        return nil
 //    }
     
     
+    
 }
+
+
+//extension String{
+//    func convertHtml() -> NSAttributedString{
+//        guard let data = data(using: .utf8) else { return NSAttributedString() }
+//        do{
+//            return try NSAttributedString(data: data, options: [NSDocumentTypeDocumentAttribute: NSHTMLTextDocumentType, NSCharacterEncodingDocumentAttribute: String.Encoding.utf8.rawValue], documentAttributes: nil)
+//        }catch{
+//            return NSAttributedString()
+//        }
+//    }
+//}
+
+
+
+

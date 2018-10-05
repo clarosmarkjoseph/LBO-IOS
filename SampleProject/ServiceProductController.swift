@@ -14,12 +14,14 @@ class ServiceProductController: UIViewController {
     @IBOutlet weak var myContainerSubView: UIView!
     var viewType:String = ""
     var delegateAppointment:ProtocolAddItem? = nil
+    var arrayServices       = [Int]()
+    var arrayProducts       = [Int]()
     
     lazy var serviceSegmentController: ServiceSegmentController = {
         let storyboard = UIStoryboard(name:"ServicesStoryboard", bundle:Bundle.main)
         var viewController = storyboard.instantiateViewController(withIdentifier: "ServiceSegmentController") as! ServiceSegmentController
         viewController.viewType = viewType
-        viewController.delegateAppointment = delegateAppointment
+        viewController.delegateAppointment  = delegateAppointment
         self.addViewControllerAsChildViewController(childViewController: viewController)
         return viewController
     }()
@@ -37,7 +39,7 @@ class ServiceProductController: UIViewController {
         let storyboard = UIStoryboard(name:"ServicesStoryboard", bundle:Bundle.main)
         var viewController = storyboard.instantiateViewController(withIdentifier: "ProductSegmentController") as! ProductSegmentController
         viewController.viewType = viewType
-        viewController.delegateAppointment = delegateAppointment
+        viewController.delegateAppointment  = delegateAppointment
         self.addViewControllerAsChildViewController(childViewController: viewController)
         return viewController
     }()
@@ -45,8 +47,11 @@ class ServiceProductController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        self.tabBarController?.tabBar.isHidden = true
         let attr = NSDictionary(object: UIFont(name: "Arial", size: 15.0)!, forKey: kCTFontAttributeName as! NSCopying)
         segmentServiceProduct.setTitleTextAttributes(attr as [NSObject : AnyObject] , for: .normal)
+        print("array in service product: \(arrayServices)")
+        print("array in service product: \(arrayProducts)")
         setupView()
     }
     
@@ -60,6 +65,8 @@ class ServiceProductController: UIViewController {
         serviceSegmentController.view.isHidden = !(segmentServiceProduct.selectedSegmentIndex == 0)
         packageSegmentController.view.isHidden = !(segmentServiceProduct.selectedSegmentIndex == 1)
         productSegmentController.view.isHidden = !(segmentServiceProduct.selectedSegmentIndex == 2)
+        serviceSegmentController.arrayServices = arrayServices
+        productSegmentController.arrayProducts = arrayProducts
     }
     
     private func setupSegmentControl(){

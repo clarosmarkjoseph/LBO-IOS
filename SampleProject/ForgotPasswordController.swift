@@ -9,7 +9,7 @@
 import UIKit
 import Alamofire
 
-class ForgotPasswordController: UIViewController {
+class ForgotPasswordController: UIViewController,UITextFieldDelegate {
 
     @IBOutlet weak var txtEmail: UITextField!
     @IBOutlet weak var txtBday: UITextField!
@@ -21,6 +21,8 @@ class ForgotPasswordController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        txtEmail.delegate = self
+        txtBday.delegate  = self
         SERVER_URL = dbclass.returnIp()
         loadPickerDate()
     }
@@ -34,15 +36,19 @@ class ForgotPasswordController: UIViewController {
     func loadPickerDate(){
         let toolbarBday = UIToolbar()
         toolbarBday.sizeToFit()
-        let flexible = UIBarButtonItem(barButtonSystemItem: UIBarButtonSystemItem.flexibleSpace, target: self, action: nil)
+        let flexible = UIBarButtonItem(barButtonSystemItem: UIBarButtonSystemItem.flexibleSpace, target: self, action:  nil)
         let btnDone  = UIBarButtonItem(barButtonSystemItem: UIBarButtonSystemItem.done, target: nil, action: #selector(doneBday))
-        let btnCancel   = UIBarButtonItem(barButtonSystemItem: .cancel, target: nil, action: nil)
+        let btnCancel   = UIBarButtonItem(barButtonSystemItem: .cancel, target: nil, action: #selector(dismissPicker))
         toolbarBday.setItems([btnCancel,flexible,btnDone], animated: false)
         txtBday.inputAccessoryView = toolbarBday
         txtBday.inputView = pickerViewBday
         //formatter
         pickerViewBday.datePickerMode   = .date
         pickerViewBday.maximumDate      = Date()
+    }
+    
+    @objc func dismissPicker(){
+        self.view.endEditing(true)
     }
     
     @objc func doneBday(){
@@ -73,9 +79,10 @@ class ForgotPasswordController: UIViewController {
             .responseJSON { response in
                 do{
                     self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode   = try response.response?.statusCode else { return }
-                    let responseError    = response.error?.localizedDescription
-                    
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                        return
+                    }
                     if let responseJSON = response.result.value{
                         var objectResponse            = responseJSON as! Dictionary<String,Any>
                         
@@ -128,10 +135,35 @@ class ForgotPasswordController: UIViewController {
         self.present(alertController, animated: true, completion:nil)
     }
     
+    func showDialog(title:String,message:String){
+        //alert box
+        let alertView = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        
+        let confirm = UIAlertAction(title: "Confirm", style: .default) { (action) in
+            
+        }
+        alertView.addAction(confirm)
+        present(alertView,animated: true,completion: nil)
+    }
     
     @IBAction func closePopup(_ sender: Any) {
         self.dismiss(animated: true, completion: nil)
     }
+    
+    //textfield ontouch anywhere to hide keyboard
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        let nextTag = textField.tag + 1
+        textField.resignFirstResponder()
+        if let nextResponder = textField.superview?.viewWithTag(nextTag) {
+            nextResponder.becomeFirstResponder()
+        }
+        return true
+    }
+    
     
     /*
     // MARK: - Navigation

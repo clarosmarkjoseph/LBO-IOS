@@ -43,8 +43,11 @@ public class DialogUtility {
      @param uiView - remove activity indicator from this view
      */
     public func hideActivityIndicator(_ uiView: UIView) {
-        self.activityIndicator.stopAnimating()
-        container.removeFromSuperview()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            self.activityIndicator.stopAnimating()
+            self.container.removeFromSuperview()
+        }
+        
     }
     
     

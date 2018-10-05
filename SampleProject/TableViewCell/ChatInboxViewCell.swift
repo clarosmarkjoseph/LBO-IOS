@@ -10,15 +10,28 @@ import UIKit
 
 class ChatInboxViewCell: UITableViewCell {
 
-    override func awakeFromNib() {
-        super.awakeFromNib()
-        // Initialization code
-    }
-
-    override func setSelected(_ selected: Bool, animated: Bool) {
-        super.setSelected(selected, animated: animated)
-
-        // Configure the view for the selected state
-    }
+    @IBOutlet var lblUsername: UILabel!
+    @IBOutlet var lblMessage: UILabel!
+    @IBOutlet var lblDate: UILabel!
+    @IBOutlet var lblCount: UILabel!
+    @IBOutlet var imgProfile: UIImageView!
+    
 
 }
+
+class ChatMessageViewCell:UITableViewCell{
+
+    @IBOutlet var imgUser: UIImageView!
+    @IBOutlet var stackviewParent: UIStackView!
+    @IBOutlet var uiviewMessage: UIView!
+    @IBOutlet var uiviewBackground: UIView!
+    @IBOutlet var lblMessage: UILabel!
+    
+    @IBOutlet var lblCaption: UILabel!
+    @IBOutlet var constraintTrailing: NSLayoutConstraint!
+    @IBOutlet var constraintLeading: NSLayoutConstraint!
+    
+    
+}
+
+

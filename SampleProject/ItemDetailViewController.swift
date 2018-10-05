@@ -22,9 +22,7 @@ class ItemDetailViewController: UIViewController {
     @IBOutlet weak var lblAnswer1: UILabel!
     @IBOutlet weak var lblAnswer2: UILabel!
     @IBOutlet var btnAdd: UIButton!
-    
-    
-    
+    let utilities       = Utilities()
     let dbclass         = DatabaseHelper()
     var SERVER_URL      = ""
     var item_id         = 0
@@ -44,7 +42,7 @@ class ItemDetailViewController: UIViewController {
         navItem.backBarButtonItem?.title = ""
         SERVER_URL        =  dbclass.returnIp()
         lblItemName.text  = item_name
-        lblItemPrice.text = "Php \(String(describing: item_price))"
+        lblItemPrice.text = utilities.convertToStringCurrency(value: "\(item_price)")
         lblDesc.text      = item_desc
         var myURL:URL
         if(item_type == "product") {
@@ -75,12 +73,11 @@ class ItemDetailViewController: UIViewController {
     
     @IBAction func addToList(_ sender: Any) {
 //        self.view.window?.rootViewController?.dismiss(animated: true, completion: nil)
-        
 //        let storyBoard = UIStoryboard(name:"AppointmentStoryboard",bundle:nil)
 //        let appointmentVC  = storyBoard.instantiateViewController(withIdentifier: "AppointmentSecondViewController") as! AppointmentSecondViewController
         self.navigationController?.popViewController(animated: true)
-        
     }
+    
     
 
 }

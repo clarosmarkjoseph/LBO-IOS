@@ -27,10 +27,11 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
     @IBOutlet var cellAttachment: UITableViewCell!
     @IBOutlet var cellApplicationType: UITableViewCell!
     @IBOutlet var cellPlatform: UITableViewCell!
+    @IBOutlet var tblTransactionHistory: UITableView!
+    
     var type = 0
     var objectApplication:PremiereLoyaltyCardList? = nil
     var objectRequest:TransactionRequest?          = nil
-    
     var arrayTransactionDetails:[PLCReviewTransactionStruct] = [PLCReviewTransactionStruct]()
     
     override func viewDidLoad() {
@@ -50,40 +51,71 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
 
     func loadData(){
         if(type == 0){
-//            let dateOnly = utilities.removeTimeFromDatetime(stringDateTime: dateTime)
-            let dateTime            = objectApplication?.created_at
+            self.navigationItem.title   = "PLC Application History"
+            let dateTime                = objectApplication?.created_at
+            var status                  = objectApplication?.status ?? ""
+           
+            if(status == "approved"){
+                lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
+            }
+            else if(status == "processing"){
+                lblStatus.backgroundColor = #colorLiteral(red: 1, green: 0.7450980392, blue: 0, alpha: 1)
+            }
+            else if(status == "delivery"){
+                lblStatus.backgroundColor = #colorLiteral(red: 0.3568627451, green: 0.7529411765, blue: 0.8705882353, alpha: 1)
+            }
+            else if(status == "ready"){
+                lblStatus.backgroundColor = #colorLiteral(red: 0.1058823529, green: 0.737254902, blue: 0.6078431373, alpha: 1)
+            }
+            else if(status == "picked_up"){
+                status = "Picked-Up"
+                lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
+            }
+            else if(status == "denied"){
+                lblStatus.backgroundColor = UIColor.red
+            }
+            else{
+                lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
+            }
+            
             lblDate.text            = utilities.getCompleteDateTimeString(stringDate: dateTime!)
             lblReferrenceNo.text    = objectApplication?.reference_no
             lblBranch.text          = objectApplication?.branch_name
-            lblStatus.text          = objectApplication?.status?.capitalized
+            lblStatus.text          = status.capitalized
             lblApplicationType.text = objectApplication?.application_type
             lblPlatform.text        = objectApplication?.platform
             lblMessage.text         = "PLC Application"
             lblRemarks.text         = objectApplication?.remarks
         }
         else{
+            self.navigationItem.title = "Transaction Review History"
+            let remarks              = objectRequest?.remarks ?? "N/A"
+            let status               = objectRequest?.status ?? "N/A"
+            let message              = objectRequest?.message ?? "N/A"
             let dateTime             = objectRequest?.created_at
-            var plc_request_data     = objectRequest?.plc_review_request_data
             lblDate.text             = utilities.getCompleteDateTimeString(stringDate: dateTime!)
             lblMessage.text          = "Transaction Request"
             lblCaptionReference.text = "Remarks:"
-            lblReferrenceNo.text     = objectRequest?.remarks?.capitalized
-            lblStatus.text           = objectRequest?.status?.capitalized
+            lblReferrenceNo.text     = remarks.capitalized
+            lblStatus.text           = status.capitalized
             lblCaptionRemarks.text   = "Your Message:"
-            lblRemarks.text          = objectRequest?.message?.capitalized
+            lblRemarks.text          = message.capitalized
             
             do{
+                let plc_request_data     = objectRequest?.plc_review_request_data
                 let jsonData              = plc_request_data?.data(using: .utf8)
                 let jsonDecoderResult     = try JSONDecoder().decode(PLCReviewDataStruct.self, from: jsonData!)
-                arrayTransactionDetails   = jsonDecoderResult.transactions!
+                if let transactionDetails = jsonDecoderResult.transactions{
+                    arrayTransactionDetails   = transactionDetails
+                }
                 collectionviewTransactions.reloadData()
+                tblTransactionHistory.reloadData()
             }
             catch{
                 print("FETCH ERROR: \(error)")
+                collectionviewTransactions.reloadData()
+                tblTransactionHistory.reloadData()
             }
-            
-            
-            
         }
     }
  
@@ -93,27 +125,33 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
             return 2
         }
         else{
-            return 3
+            if arrayTransactionDetails.count > 0{
+                return 3
+            }
+            return 2
         }
-    }
-    
-    override func tableView(_ tableView: UITableView, estimatedHeightForFooterInSection section: Int) -> CGFloat {
-        return UITableViewAutomaticDimension
     }
     
     override func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         
-        if(type == 1){
-            print("SECTION NO: \(indexPath.section)")
+        if(type == 0){
+            if(indexPath.section == 1){
+                if(indexPath.row == 3){
+                    return 0
+                }
+            }
+            return 45
+        }
+        else{
             if (indexPath.section == 0){
                 if(indexPath.row == 3){
                     return 0
                 }
-                return UITableViewAutomaticDimension
+                return 45
             }
             if(indexPath.section == 1){
                 if(indexPath.row == 2 || indexPath.row == 3){
-                    return UITableViewAutomaticDimension
+                    return 45
                 }
                 return 0
             }
@@ -121,14 +159,6 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
                 return 145
             }
         }
-        else{
-            if(indexPath.section == 1){
-                if(indexPath.row == 3){
-                     return 0
-                }
-            }
-        }
-       
         return UITableViewAutomaticDimension
     }
     
@@ -140,16 +170,14 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionviewTransactions.dequeueReusableCell(withReuseIdentifier: "cellRequest", for: indexPath) as! TransactionRequestCell
-        
         let dictionaryLastTransaction   = arrayTransactionDetails[indexPath.row].last_transaction
         let unfiltered_amount           = dictionaryLastTransaction?.net_amount
         let net_price                   = utilities.getNumberValueInString(stringValue: "\(unfiltered_amount)")
         let raw_date                    = dictionaryLastTransaction?.date ?? "0000-00-00"
-        cell.lblReferenceNo.text        = dictionaryLastTransaction?.inv
+        cell.lblReferenceNo.text        = utilities.getNumberValueInString(stringValue: "\(stringValue: dictionaryLastTransaction?.inv)")
         cell.lblBranch.text             = dictionaryLastTransaction?.branch
         cell.lblDate.text               = dictionaryLastTransaction?.date ?? "0000-00-00"
         cell.lblPrice.text              = utilities.convertToStringCurrency(value:net_price)
-        print("Price: \(net_price)")
         return cell
     }
     
@@ -158,29 +186,23 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
         if let index = self.tableView.indexPathForSelectedRow{
             self.tableView.deselectRow(at: index, animated: true)
         }
-        
         if indexPath.section == 1{
             if indexPath.row == 3{
-                let imgName = objectRequest?.valid_id_url
-                let url                 = "https://lbo.lay-bare.com/images/ids/2_1530670460.jpg"
-                let storyBoard          = UIStoryboard(name:"PremiereStoryboard",bundle:nil)
-                let viewController      = storyBoard.instantiateViewController(withIdentifier: "TransactionPreviewAttachmentController") as! TransactionPreviewAttachmentController
-                viewController.imgSRC   = url
-                self.navigationController?.isNavigationBarHidden    = true
-                self.navigationController?.pushViewController(viewController, animated: true)
+                let imgName     = objectRequest?.valid_id_url
+                let SERVER_URL  = dbclass.returnIp()
                 
                 
-//                if(imgName == "" || imgName == nil){
-//                    self.showDialog(title: "No file / image attached!", message: "Sorry, there is no file / image attached.")
-//                }
-//                else{
-////                    let url = "\(dbclass.returnIp())/images/ids/\(imgName)"
-//                    let url                 = "http://lbo.lay-bare.com/images/ids/2_1530670460.jpg"
-//                    let storyBoard          = UIStoryboard(name:"PremiereStoryboard",bundle:nil)
-//                    let viewController      = storyBoard.instantiateViewController(withIdentifier: "TransactionPreviewAttachmentController") as! TransactionPreviewAttachmentController
-//                    viewController.imgSRC   = url
-//                    self.navigationController?.pushViewController(viewController, animated: true)
-//                }
+                if(imgName == "" || imgName == nil || imgName == "null"){
+                    self.showDialog(title: "No file / image attached!", message: "Sorry, there is no file / image attached.")
+                }
+                else{
+                    let url             = "\(SERVER_URL)/images/ids/\(imgName!)"
+                    let storyBoard      = UIStoryboard(name:"PremiereStoryboard",bundle:nil)
+                    let viewController  = storyBoard.instantiateViewController(withIdentifier: "TransactionPreviewAttachmentController") as! TransactionPreviewAttachmentController
+                    viewController.imgSRC   = url
+                    self.navigationController?.isNavigationBarHidden    = true
+                    self.navigationController?.pushViewController(viewController, animated: true)
+                }
             }
         }
     }
@@ -197,7 +219,7 @@ class PremiereHistoryDetailsController: UITableViewController,UICollectionViewDa
     }
     
     override func viewDidAppear(_ animated: Bool) {
-//        AppDelegate.AppUtility.lockOrientation(UIInterfaceOrientationMask.portrait, andRotateTo: UIInterfaceOrientation.landscapeLeft)
+        
     }
 
 }

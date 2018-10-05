@@ -21,6 +21,7 @@ class PromotionController: UIViewController,UITableViewDelegate,UITableViewDataS
     @IBOutlet var tblPromotions: UITableView!
     
     
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         SERVER_URL                  = dbclass.returnIp()
@@ -37,8 +38,11 @@ class PromotionController: UIViewController,UITableViewDelegate,UITableViewDataS
         Alamofire.request(promoURL, method: .get)
             .responseJSON { response in
                 do{
-                    self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode    = try response.response?.statusCode else { return }
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.loadPromotions()
+                        return
+                    }
                     if let responseJSONData = response.data{
                         if(statusCode == 200 || statusCode == 201){
                             let jsonString = self.utilities.convertDataToJSONString(data: responseJSONData)
@@ -81,11 +85,18 @@ class PromotionController: UIViewController,UITableViewDelegate,UITableViewDataS
     }
     
     func loadPromotions(){
+        
+        self.dialogUtil.hideActivityIndicator(self.view)
         do{
-            let jsonString              = dbclass.returnPromotions()
-            let jsonData                = jsonString.data(using: .utf8)
-            arrayPromotions             = try JSONDecoder().decode([PromotionStruct].self, from: jsonData!)
-            self.tblPromotions.reloadData()
+            let jsonString  = dbclass.returnPromotions()
+            let jsonData    = jsonString.data(using: .utf8)
+            arrayPromotions = try JSONDecoder().decode([PromotionStruct].self, from: jsonData!)
+            if (arrayPromotions.count > 0){
+                self.tblPromotions.reloadData()
+            }
+            else{
+                 self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+            }
         }
         catch{
              self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
@@ -103,10 +114,14 @@ class PromotionController: UIViewController,UITableViewDelegate,UITableViewDataS
         present(alertView,animated: true,completion: nil)
     }
     
-    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         print("COunt: \(arrayPromotions.count)")
         return arrayPromotions.count
+    }
+    
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+//        return UITableViewAutomaticDimension
+        return 130.0
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -118,9 +133,10 @@ class PromotionController: UIViewController,UITableViewDelegate,UITableViewDataS
         let promo_desc  = arrayPromotions[position].description ?? ""
         var date_start  = arrayPromotions[position].date_start ?? ""
         var date_end    = arrayPromotions[position].date_end ?? ""
-        
         let branches    = arrayPromotions[position].branches
         var date        = ""
+        let promo_img   = arrayPromotions[position].promo_picture
+        let imgURL      = URL(string: SERVER_URL+"/images/promotions/"+promo_img!)
 
         if(promo_type == "promo"){
             date_start  = utilities.removeTimeFromDatetime(stringDateTime: date_start)
@@ -132,34 +148,31 @@ class PromotionController: UIViewController,UITableViewDelegate,UITableViewDataS
         }
         
         cell.lblTitle.text  = promo_title
-        let data            = promo_desc.data(using: String.Encoding.unicode)
-        let attrStr         = try? NSAttributedString( // do catch
-            data: data!,
-            options: [NSAttributedString.DocumentReadingOptionKey.documentType: NSAttributedString.DocumentType.html],
-            documentAttributes: nil
-        )
-        cell.lblContent.textColor       = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
-        cell.lblContent.attributedText  = attrStr
+        cell.imgPromotion.kf.setImage(with: imgURL,
+                                        placeholder: UIImage(named: "noImage"),
+                                        options: nil,
+                                        progressBlock: nil,
+                                        completionHandler: { (image: UIImage?, error: Error?, cache, url) in
+                                            if error != nil {
+                                                cell.imgPromotion.image = UIImage(named: "noImage")
+                                            }
+        })
         cell.lblDate.text = date
         return cell
     }
     
-    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        let position    = indexPath.row
-        let promo_img   = arrayPromotions[position].promo_picture
-        let imgURL      = URL(string: SERVER_URL+"/images/promotions/"+promo_img!)
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let objectPromotion = arrayPromotions[indexPath.row]
+        let storyBoard = UIStoryboard(name:"OtherStoryboard",bundle:nil)
+        let notificationVC  = storyBoard.instantiateViewController(withIdentifier: "NotificationDetailsController") as! NotificationDetailsController
+        notificationVC.objectPromotions  = objectPromotion
+        notificationVC.notification_type = "promotion"
+        self.tabBarController?.tabBar.isHidden = true
+        self.navigationController?.pushViewController(notificationVC, animated: true)
         
-        if let myCell = cell as? PromotionViewCell{
-            myCell.imgPromotion.kf.setImage(with: imgURL,
-                                            placeholder: UIImage(named: "noImage"),
-                                            options: nil,
-                                            progressBlock: nil,
-                                            completionHandler: nil)
-        }
-        
-       
     }
     
+  
     
 
     override func didReceiveMemoryWarning() {

@@ -14,8 +14,6 @@ import Kingfisher
 class FAQController: UITableViewController {
 
     @IBOutlet var tblFAQCategory: UITableView!
-    
-    
     let utilities  = Utilities()
     let dbclass    = DatabaseHelper()
     var SERVER_URL = ""
@@ -45,15 +43,18 @@ class FAQController: UITableViewController {
         Alamofire.request(faqURL, method: .get)
             .responseJSON { response in
                 do{
-                    self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode    = try response.response?.statusCode else { return }
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.loadFAQ()
+                        return
+                    }
                     if let responseJSONData = response.data{
                         if(statusCode == 200 || statusCode == 201){
                             let jsonString = self.utilities.convertDataToJSONString(data: responseJSONData)
-                            let promotion_tbl = self.dbclass.promotion_tbl
+                            let faq_tbl = self.dbclass.faq_tbl
                             do{
                                 let date_updated = self.utilities.getCurrentDateTime(ifDateOrTime: "datetime")
-                                let countData    = try self.dbclass.db?.scalar(promotion_tbl.count)
+                                let countData    = try self.dbclass.db?.scalar(faq_tbl.count)
                                 if(countData! <= 0){
                                     self.dbclass.insertFAQ(objectString: jsonString, date_updated: date_updated)
                                 }
@@ -92,9 +93,15 @@ class FAQController: UITableViewController {
             print(jsonString)
             let jsonData    = jsonString.data(using: .utf8)
             faqResult       = try JSONDecoder().decode(FAQResultStruct?.self, from: jsonData!)
-            faqCategory     = (faqResult?.category)!
-            faqQuestion     = (faqResult?.questions)!
-            tblFAQCategory.reloadData()
+            faqCategory     = faqResult?.category ?? [FAQCategoryStruct]()
+            faqQuestion     = faqResult?.questions ?? [FAQQuestionStruct]()
+            self.dialogUtil.hideActivityIndicator(self.view)
+            if(faqCategory.count > 0){
+                tblFAQCategory.reloadData()
+            }
+            else{
+                self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+            }
         }
         catch{
             print("ERROR: \(error)")
@@ -137,10 +144,15 @@ class FAQController: UITableViewController {
         //alert box
         let alertView = UIAlertController(title: title, message: message, preferredStyle: .alert)
         
-        let confirm = UIAlertAction(title: "Confirm", style: .default) { (action) in
+        let confirm = UIAlertAction(title: "Retry", style: .default) { (action) in
+            self.loadFAQ()
+        }
+        
+        let cancel = UIAlertAction(title: "Cancel", style: .cancel) { (action) in
             
         }
         alertView.addAction(confirm)
+        alertView.addAction(cancel)
         present(alertView,animated: true,completion: nil)
     }
     
@@ -161,7 +173,6 @@ class FAQController: UITableViewController {
         viewController.arrayQuestions   = questions
         self.navigationController?.pushViewController(viewController, animated: true)
         self.tabBarController?.tabBar.isHidden = true
-        
     }
     
  

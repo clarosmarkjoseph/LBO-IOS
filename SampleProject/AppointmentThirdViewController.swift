@@ -8,6 +8,7 @@
 
 import UIKit
 import Alamofire
+import SocketIO
 
 class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITableViewDataSource {
     
@@ -29,10 +30,16 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
     var arrayWaiverQuestion     = [Dictionary<String,Any>]()
     var arrayDisabledServices   = [Int]()
     var ifHasMonthlyCycle       = false
+    var socketConnection        = SocketConnection()
+    var webSocket:SocketIOClient!
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        webSocket = socketConnection.getWebSocket()
+        webSocket.connect()
+        
         tblWaiver.delegate           = self
         tblWaiver.dataSource         = self
         tblWaiver.rowHeight          = UITableViewAutomaticDimension
@@ -41,6 +48,10 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
         gender                  = utilities.getUserGender()
         getClientDetails()
         loadWaiver()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        webSocket.disconnect()
     }
     
     func getClientDetails(){
@@ -57,7 +68,6 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
     func loadWaiver(){
     
         dialogUtil.showActivityIndicator(self.view)
-        
         let waiver_tbl = dbclass.waiver_tbl
         do{
             if let queryWaiver          = try dbclass.db?.pluck(waiver_tbl) {
@@ -133,7 +143,6 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
                     else{
                         continue
                     }
-                    
                 }
                 tblWaiver.reloadData()
                 dialogUtil.hideActivityIndicator(self.view)
@@ -153,8 +162,11 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
         Alamofire.request(schedUrl, method: .get)
             .responseJSON { response in
                 do{
-                    guard let statusCode    = try response.response?.statusCode else { return }
-                    let responseError       = response.error?.localizedDescription
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                        return
+                    }
                     
                     if(statusCode == 200 || statusCode == 201){
                         let responseJSONData    = response.result.value as! [Dictionary<String,Any>]
@@ -163,9 +175,14 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
                     }
                     else{
                         self.dialogUtil.hideActivityIndicator(self.view)
-                        let objectResponse = response.result.value as! Dictionary<String, Any>
-                        let arrayError = self.utilities.handleHttpResponseError(objectResponseError: objectResponse ,statusCode:statusCode)
-                        self.showDialog(title:arrayError[0], message: arrayError[1])
+                        let responseValue = response.result.value
+                        if responseValue != nil{
+                            let arrayError = self.utilities.handleHttpResponseError(objectResponseError: responseValue as! Dictionary<String, Any> ,statusCode:statusCode)
+                            self.showDialog(title:arrayError[0], message: arrayError[1])
+                        }
+                        else{
+                            self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                        }
                     }
                 }
                 catch{
@@ -522,12 +539,13 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
     func nextAction(){
         
         self.dialogUtil.showActivityIndicator(self.view)
-        let jsonObjectString  = utilities.convertDictionaryToJSONString(dictionaryVal: self.objectAppointment)
         
         let stringUrl   = self.SERVER_URL+"/api/appointment/addAppointment?token=\(self.utilities.getUserToken())"
         let url         = URL(string: stringUrl)!
-        let jsonData    = utilities.convertJSONStringToData(arrayString: jsonObjectString)
-        var request     = URLRequest(url: url)
+        
+        let jsonObjectString    = utilities.convertDictionaryToJSONString(dictionaryVal: self.objectAppointment)
+        let jsonData            = utilities.convertJSONStringToData(arrayString: jsonObjectString)
+        var request             = URLRequest(url: url)
         request.httpMethod = HTTPMethod.post.rawValue
         request.setValue("application/json; charset=UTF-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
@@ -541,11 +559,27 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
                 .responseJSON { response in
                     do{
                         self.dialogUtil.hideActivityIndicator(self.view)
-                        guard let statusCode    = try response.response?.statusCode else { return }
+                        guard let statusCode   = try response.response?.statusCode else {
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                            return
+                        }
                         if response.data != nil{
                             print("STATUS CODE: \(statusCode)")
                             if(statusCode == 200 || statusCode == 201){
+                                let objectBranch    = self.objectAppointment["branch"] as! Dictionary<String,Any>
+                                let branch_id       = objectBranch["value"] as! Int
+                                self.webSocket.emit("refreshAppointments", branch_id)
                                 self.finishAppointment()
+                            }
+                            else if statusCode == 401{
+                                self.dialogUtil.hideActivityIndicator(self.view)
+                                self.utilities.deleteAllData()
+                                let mainStoryboard: UIStoryboard = UIStoryboard(name: "LoginStoryboard", bundle: nil)
+                                let viewController = mainStoryboard.instantiateViewController(withIdentifier: "LoginController") as! LoginController
+                                viewController.isLoggedOut      = true
+                                viewController.sessionExpired   = true
+                                UIApplication.shared.keyWindow?.rootViewController = viewController
                             }
                             else{
                                 let responseValue = response.result.value
@@ -578,8 +612,6 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
         alertView.addAction(cancel)
         self.present(alertView,animated: true,completion: nil)
         
-        
-    
     }
     
     func finishAppointment(){
@@ -587,10 +619,16 @@ class AppointmentThirdViewController: UIViewController,UITableViewDelegate,UITab
         let alertView = UIAlertController(title: "Succesfully Booked!", message: "You have successfully booked your appointment!", preferredStyle: .alert)
         
         let confirm = UIAlertAction(title: "Confirm", style: .default) { (action) in
+            self.webSocket.disconnect()
             self.navigationController?.popToRootViewController(animated: true);
         }
         alertView.addAction(confirm)
         self.present(alertView,animated: true,completion: nil)
     }
+    
+    
+    
+    
+    
 
 }

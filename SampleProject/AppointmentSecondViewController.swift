@@ -25,16 +25,16 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
     var rooms_count       = 0
     let dialogUtil        = DialogUtility()
     var selectedDateTime:Date = Date()
+    var branchStart:Date    = Date()
+    var branchEnd:Date      = Date()
+    var arrayServices       = [Int]()
+    var arrayProducts       = [Int]()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         SERVER_URL = dbclass.returnIp()
         tblItemList.delegate        = self
         tblItemList.dataSource      = self
-        let selectedDatetimeString  = objectAppointment["transaction_date"] as! String
-        selectedDateTime            = utilities.convertStringToDateTime(stringDate: selectedDatetimeString)
-//        self.navigationItem.rightBarButtonItem              = self.editButtonItem
-//        self.navigationItem.rightBarButtonItem?.tintColor   = UIColor.white
     }
 
     override func didReceiveMemoryWarning() {
@@ -46,12 +46,26 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
         let appointmentVC  = storyBoard.instantiateViewController(withIdentifier: "ServiceProductController") as! ServiceProductController
         appointmentVC.viewType              = "appointment"
         appointmentVC.delegateAppointment   = self
+        
         self.navigationController?.pushViewController(appointmentVC, animated: true)
     }
     
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return arrayList.count
+        if arrayList.count <= 0{
+            var emptyLabel = UILabel(frame: CGRect(x: 0, y: 0, width: self.view.bounds.size.width, height: self.view.bounds.size.height))
+            emptyLabel.text             = "Item list is empty\n\n Click (+) to add item"
+            emptyLabel.textColor        = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+            emptyLabel.numberOfLines    = 0
+            emptyLabel.textAlignment    = NSTextAlignment.center
+            self.tblItemList.backgroundView = emptyLabel
+            self.tblItemList.separatorStyle = UITableViewCellSeparatorStyle.none
+            return 0
+        }
+        else {
+            self.tblItemList.backgroundView = nil
+            return arrayList.count
+        }
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -97,8 +111,8 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
       
         cell.imgItem.kf.setImage(with: myURL)
         cell.lblQty.text        = String(item_quantity)
-        cell.lblPrice.text      = "Php \(String(item_price))"
-        cell.lblSubtotal.text   = "Php \(String(subTotal))"
+        cell.lblPrice.text      = utilities.convertToStringCurrency(value: "\(item_price)")
+        cell.lblSubtotal.text   = utilities.convertToStringCurrency(value: "\(subTotal)")
         cell.lblItemName.text   = item_name
         
         cell.btnMinus.tag       = position
@@ -124,11 +138,13 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
         var initSubTotal = Double(itemQty) * itemPrice
         
         if(itemType == "services" ){
-             self.showDialog(title: "Only 1 service!", message: "Sorry, you can only select service one at a time")
+            self.showDialog(title: "Only 1 service!", message: "Sorry, you can only select service one at a time")
+            return
         }
         else{
             if(itemQty <= 1){
                 self.showDialog(title: "No less than 1", message: "Sorry, quantity must not less than 1")
+                return
             }
             else{
                 itemQty-=1
@@ -137,9 +153,10 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
                 totalQty-=1
                 totalPrice-=initSubTotal
                 lblTotalQty.text    = String(totalQty)
-                lblTotalPrice.text  = "Php \(String(totalPrice))"
+                lblTotalPrice.text  = utilities.convertToStringCurrency(value: "\(totalPrice)")
                 tblItemList.reloadData()
             }
+            
         }
     }
 
@@ -156,25 +173,26 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
         
         if(itemType == "services" ){
             self.showDialog(title: "Only 1 service!", message: "Sorry, you can only select service one at a time")
+            return
+        }
+        if(itemType == "packages"){
+            self.showDialog(title: "Only 1 package!", message: "Sorry, you can only select package at a time")
+            return
         }
         else{
-            if(itemQty > 5){
+            if(itemQty >= 5){
                 self.showDialog(title: "No greater than 5", message: "Sorry, quantity must not greater than 5")
+                return
             }
             else{
-                
                 itemQty+=1
                 objectItem["item_quantity"] = itemQty
                 arrayList[index]            = objectItem
-                
                 initSubTotal                = Double(itemQty) * itemPrice
-
                 totalQty+=1
                 totalPrice+=initSubTotal
-                
                 lblTotalQty.text    = String(totalQty)
-                lblTotalPrice.text  = "Php \(String(totalPrice))"
-                
+                lblTotalPrice.text  = utilities.convertToStringCurrency(value: "\(totalPrice)")
                 tblItemList.reloadData()
             }
         }
@@ -186,19 +204,13 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
         let objectItem      = arrayList[index] as! Dictionary<String,Any>
         let itemQty         = objectItem["item_quantity"] as! Int
         let itemPrice       = objectItem["item_price"] as! Double
-        
         let initSubtotal    = Double(itemQty) * itemPrice
-        
         arrayList.remove(at: index)
-        
         totalQty-=itemQty
         totalPrice-=initSubtotal
-        
         lblTotalQty.text    = String(totalQty)
-        lblTotalPrice.text  = "Php \(String(totalPrice))"
+        lblTotalPrice.text  = utilities.convertToStringCurrency(value: "\(totalPrice)")
         reCalculateTime()
-       
-        
     }
     
     
@@ -489,18 +501,33 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
             objectItems["item_variation"]  = item_variation
         }
         else{
-            objectItems["item_start_time"]  = start_time
-            objectItems["item_end_time"]    = end_time
+//            let pickedStart = utilities.convertStringToDateTime(stringDate: "\(start_time)")
+            let pickedEnd   = utilities.convertStringToDateTime(stringDate: "\(end_time)")
+            
+            if((branchEnd.compare(pickedEnd) == .orderedAscending)){
+                print("wew closed na yan pag ganyan")
+                self.dialogUtil.hideActivityIndicator(self.view)
+                self.showDialog(title: "Schedule Time exceed", message: "The service time for this service exceeds the schedule of the technician / branch selected")
+                return;
+            }
+            else{
+                objectItems["item_start_time"]  = start_time
+                objectItems["item_end_time"]    = end_time
+            }
         }
         
         let itemInitPrice = Double(quantity) * price
         totalQty+=quantity
         totalPrice+=itemInitPrice
         lblTotalQty.text    = String(totalQty)
-        lblTotalPrice.text  = "Php \(String(totalPrice))"
+        lblTotalPrice.text  = utilities.convertToStringCurrency(value: "\(totalPrice)") 
         arrayList.append(objectItems)
         tblItemList.reloadData()
+        
+        let lastRow = IndexPath(row: self.arrayList.count - 1, section: 0)
+        self.tblItemList.scrollToRow(at: lastRow, at: .top , animated: false)
         dialogUtil.hideActivityIndicator(self.view)
+        
     }
     
     
@@ -540,12 +567,13 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
                 var objectParams        = Dictionary<String,Any>()
                 let item_id             = rowList["item_id"] as! Int
                 let item_price          = rowList["item_price"] as! Double
-                let item_start          = rowList["item_start_time"] as! String
-                let item_end            = rowList["item_end_time"] as! String
+           
                 let item_quantity       = rowList["item_quantity"] as! Int
                 let item_type           = rowList["item_type"] as! String
                 
                 if(item_type == "services" || item_type == "packages"){
+                    let item_start          = rowList["item_start_time"] as! String
+                    let item_end            = rowList["item_end_time"] as! String
                     let item_duration = rowList["item_duration"] as! Int
                     totalDuration+=item_duration
                     objectParams["id"]      = item_id
@@ -559,7 +587,6 @@ class AppointmentSecondViewController: UIViewController,UITableViewDelegate,UITa
                     objectParams["price"]       = item_price
                     objectParams["quantity"]    = item_quantity
                     arrayProducts.append(objectParams)
-                   
                 }
                 
                 if(loopIndex == arrayList.count - 1){

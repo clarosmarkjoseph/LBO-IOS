@@ -11,9 +11,9 @@ import Kingfisher
 
 class TransactionPreviewAttachmentController: UIViewController {
     
+    @IBOutlet var imgAttachment: UIImageView!
     var utilities = Utilities()
     var imgSRC    = ""
-    @IBOutlet var imgAttachment: UIImageView!
     
     
     override func viewDidLoad() {

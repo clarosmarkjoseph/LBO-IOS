@@ -46,11 +46,19 @@ class FAQuestionController: UITableViewController {
         let question = arrayQuestions[indexPath.row].question!
         let answer = arrayQuestions[indexPath.row].answer!
         
-        cell.lblQuestionTitle.text  = question
-        cell.lblQuestionAnswer.text = answer
-        
+        cell.lblQuestionTitle.text   = question
+        cell.lblQuestionAnswer.text  = answer
+        let data            = answer.data(using: String.Encoding.utf16,allowLossyConversion: false)
+        let attrStr         = try? NSAttributedString( // do catch
+                data: data!,
+                options: [NSAttributedString.DocumentReadingOptionKey.documentType: NSAttributedString.DocumentType.html],
+                documentAttributes: nil)
+        cell.lblQuestionAnswer.attributedText = attrStr
+        cell.lblQuestionAnswer.font = UIFont.italicSystemFont(ofSize: 17.0)
+        cell.lblQuestionAnswer.textColor = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
         return cell
     }
+    
 
 
     /*
@@ -99,3 +107,4 @@ class FAQuestionController: UITableViewController {
     */
 
 }
+

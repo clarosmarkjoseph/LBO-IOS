@@ -10,8 +10,12 @@ import UIKit
 import Alamofire
 import PopupDialog
 
-class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSource,UITextFieldDelegate {
-  
+protocol ProtocolForSignup {
+    func setupAgreement(isAgreed:Bool);
+}
+
+class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSource,UITextFieldDelegate,ProtocolForSignup{
+    
     @IBOutlet weak var txtFname: UITextField!
     @IBOutlet weak var txtMname: UITextField!
     @IBOutlet weak var txtLname: UITextField!
@@ -25,6 +29,7 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
     @IBOutlet weak var txtConfirmPassword: UITextField!
     @IBOutlet weak var btnTerms: UIButton!
     @IBOutlet weak var btnRegister: UIButton!
+    @IBOutlet var bottomConstraint: NSLayoutConstraint!
     
     let dialogUtil              = DialogUtility()
     let dbclass                 = DatabaseHelper()
@@ -45,11 +50,23 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
     var fbBday                  = ""
     var fbImage                 = ""
     var fbGender                = ""
+    var fbEmail                 = ""
     var branchID                = 0
+    var paramsFacebook:Parameters = [:]
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        txtFname.delegate       = self
+        txtMname.delegate       = self
+        txtLname.delegate       = self
+        txtAddress.delegate     = self
+        txtBday.delegate        = self
+        txtContact.delegate     = self
+        txtBranch.delegate      = self
+        txtEmail.delegate       = self
+        txtPassword.delegate    = self
+        txtConfirmPassword.delegate = self
         if let device_id =  UIDevice.current.identifierForVendor?.uuidString{
             deviceID = device_id
         }
@@ -60,6 +77,82 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
         getTerms()
         loadPickerDate()
         loadBranch()
+        
+        if(!paramsFacebook.isEmpty){
+            fbID        = paramsFacebook["fb_id"] as! String
+            fbFname     = paramsFacebook["fb_fname"] as! String
+            fbLname     = paramsFacebook["fb_lname"] as! String
+            fbBday      = paramsFacebook["fb_bday"] as! String
+            fbImage     = paramsFacebook["fb_image"] as! String
+            fbGender    = paramsFacebook["fb_gender"] as! String
+            fbEmail     = paramsFacebook["fb_email"] as! String
+            branchID    = 0
+            txtFname.text = fbFname
+            txtLname.text = fbLname
+            txtEmail.text = fbEmail
+            if fbGender == "male"{
+                segmentGender.selectedSegmentIndex = 1
+            }
+            else{
+                segmentGender.selectedSegmentIndex = 0
+            }
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let dateBday = dateFormatter.date(from: fbBday)
+            let dateBdayString  = dateFormatter.string(from: dateBday!)
+            txtBday.text        = dateBdayString
+            self.showDialog(title: "Welcome to Lay Bare Registration", message: "Hello, you've just logged-in via facebook. Please register to continue using the platform")
+        }
+    }
+    
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        
+        guard let text  = textField.text else { return true }
+        let newLength   = text.characters.count + string.characters.count - range.length
+        if(textField == txtContact){
+            return newLength <= 10 // Bool
+        }
+        return true
+    }
+    
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        
+        if ((textField == txtContact ) || (textField == txtBranch) || (textField == txtEmail) || (textField == txtPassword) || (textField == txtConfirmPassword) ){
+            animateViewMoving(up: true, moveValue: 200)
+        }
+    }
+    
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        if ((textField == txtContact ) || (textField == txtBranch) || (textField == txtEmail) || (textField == txtPassword) || (textField == txtConfirmPassword) ){
+           animateViewMoving(up: false, moveValue: 200)
+        }
+    }
+
+    
+    func animateViewMoving(up:Bool, moveValue :CGFloat){
+      
+        let movementDuration:TimeInterval = 0.3
+        let movement:CGFloat = ( up ? -moveValue : moveValue)
+        UIView.beginAnimations( "animateView", context: nil)
+        UIView.setAnimationBeginsFromCurrentState(true)
+        UIView.setAnimationDuration(movementDuration )
+        self.view.frame = self.view.frame.offsetBy(dx: 0, dy: movement)
+        UIView.commitAnimations()
+    
+    }
+    
+    //textfield ontouch anywhere to hide keyboard
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        let nextTag = textField.tag + 1
+        textField.resignFirstResponder()
+        if let nextResponder = textField.superview?.viewWithTag(nextTag) {
+            nextResponder.becomeFirstResponder()
+        }
+        return true
     }
     
     func getTerms(){
@@ -71,23 +164,28 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
             }
             else{
                 let termUrl    = SERVER_URL+"/api/config/getTerms"
-                let urlTerms   = URL(string: termUrl)
                 let requestParams: Parameters = ["":""]
                 Alamofire.request(termUrl, method: .get, parameters: requestParams)
                     .responseString { response in
                         do{
-                            guard let statusCode   = try response.response?.statusCode else { return }
-                            let responseError    = response.error?.localizedDescription
-                            if(statusCode == 200){
+                            guard let statusCode   = try response.response?.statusCode else {
+                                self.dialogUtil.hideActivityIndicator(self.view)
+                                self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                                return
+                            }
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            
+                            if(statusCode == 200 || statusCode == 201){
                                 self.stringTerms = response.value!
                                 self.dbclass.insertTerms(terms_string: self.stringTerms)
                             }
-                            if(responseError != nil){
-                                print("Error response: \(responseError)")
+                            else{
+                                 self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
                             }
                         }
                         catch{
                             print("Error1: \(response.error)")
+                            self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
                         }
                 }
             }
@@ -168,21 +266,6 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
         self.view.endEditing(true)
     }
     
-    
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        let nextTag = textField.tag + 1
-        
-        if let nextResponder = textField.superview?.viewWithTag(nextTag) {
-            nextResponder.becomeFirstResponder()
-        }
-        else {
-            textField.resignFirstResponder()
-        }
-        
-        return true
-    }
-    
-    
     func numberOfComponents(in pickerView: UIPickerView) -> Int {
         return 1
     }
@@ -193,7 +276,6 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
     
     func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
         branchID = arrayBranchID[row]
-        print(branchID)
         return arrayBranch[row]
     }
     
@@ -206,9 +288,22 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
             let modalVC:TermConditionViewController = segue.destination as! TermConditionViewController
             modalVC.stringTerms     = self.stringTerms
             modalVC.ifTermsAgreed   = self.ifTermsAgree
+            modalVC.delegate        = self
+        }
+        
+        
+    }
+    
+    func setupAgreement(isAgreed: Bool) {
+        if(isAgreed == true){
+            btnRegister.isEnabled = true
+            btnRegister.alpha = 1.0
+        }
+        else{
+            btnRegister.isEnabled = false
+            btnRegister.alpha = 0.7
         }
     }
-  
 
     
     @IBAction func registerUser(_ sender: Any) {
@@ -228,6 +323,9 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
         }
         else if(txtContact.text!.isEmpty) {
             promptAndFocus(titles: "Missing required data", messages: "Please provide your contact number", actions: txtContact)
+        }
+        else if(txtContact.text!.count < 10) {
+            promptAndFocus(titles: "Invalid Contact no", messages: "Please enter your valid phone no.", actions: txtContact)
         }
         else if(txtBday.text!.isEmpty){
             promptAndFocus(titles: "Missing required data", messages: "Please provide your birth date", actions: txtBday)
@@ -260,8 +358,9 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
             promptAndFocus(titles: "Password verification", messages: "Password must contain more than 9 numbers or digits", actions: txtPassword)
         }
         else{
-           
-            let gender = segmentGender.titleForSegment(at: segmentGender.selectedSegmentIndex)
+            
+            let gender      = segmentGender.titleForSegment(at: segmentGender.selectedSegmentIndex)!
+            let contactNo   = "+63\(txtContact.text!)"
             self.dialogUtil.showActivityIndicator(self.view)
             let myURL = SERVER_URL+"/api/mobile/registerUser"
             let requestParams: Parameters = [
@@ -270,7 +369,7 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
                 "addMname":txtMname.text!,
                 "addLname":txtLname.text!,
                 "addAddress":txtAddress.text!,
-                "addMobile":txtContact.text!,
+                "addMobile":contactNo,
                 "addBday":txtBday.text!,
                 "addGender":gender,
                 "addPassword":txtPassword.text!,
@@ -278,33 +377,44 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
                 "addBossID":0,
                 "addBossArray":"[]",
                 "addDevice":device,
+                "addFBID":fbID,
+                "addImageUrl":fbImage,
                 "addDeviceName":devicetype,
-                "addImageUrl":"",
                 "addUniqueID":deviceID,
                 ]
-            
+
             Alamofire.request(myURL, method: .post, parameters: requestParams)
                 .responseJSON { response in
                     do{
                         self.dialogUtil.hideActivityIndicator(self.view)
-                        guard let statusCode   = try response.response?.statusCode else { return }
-                        let responseError    = response.error?.localizedDescription
-                        
-                        if let responseJSON = response.result.value{
-                            var objectResponse            = responseJSON as! Dictionary<String,Any>
-                            
+                        guard let statusCode   = try response.response?.statusCode else {
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                            return
+                        }
+                        if response.data != nil{
                             if(statusCode == 200 || statusCode == 201){
+                                self.dialogUtil.hideActivityIndicator(self.view)
+                                let objectResponse   = response.result.value as! Dictionary<String,Any>
                                 let msgResult        = objectResponse["result"] as! String
                                 let isFacebook       = objectResponse["isFacebook"] as! Bool
                                 self.showCompleteRegistration(isFacebook:isFacebook,objectResponse:objectResponse)
                                 return
                             }
                             else{
-                                let arrayError = self.utilities.handleHttpResponseError(objectResponseError: objectResponse,statusCode:statusCode)
-                                self.showDialog(title:arrayError[0], message: arrayError[1])
+                                self.dialogUtil.hideActivityIndicator(self.view)
+                                let objectResponse = response.result.value as! Dictionary<String,Any>
+                                if(response.result.value != nil){
+                                    let arrayError = self.utilities.handleHttpResponseError(objectResponseError: objectResponse,statusCode:statusCode)
+                                    self.showDialog(title:arrayError[0], message: arrayError[1])
+                                }
+                                else{
+                                    self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                                }
                             }
                         }
                         else{
+                            self.dialogUtil.hideActivityIndicator(self.view)
                             self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
                         }
                     }
@@ -390,6 +500,7 @@ class SignupController: UIViewController,UIPickerViewDelegate,UIPickerViewDataSo
         // Dispose of any resources that can be recreated.
     }
     
+  
     
 
 }

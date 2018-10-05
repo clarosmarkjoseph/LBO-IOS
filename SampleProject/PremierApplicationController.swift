@@ -39,7 +39,6 @@ class PremierApplicationController: UIViewController,ProtocolBranch {
         let home_branch = utilities.getBranchName(branch_id: home_branch_id)
         txtBranch.text  = home_branch
         txtBranch.addTarget(self, action: #selector(showBranches), for: UIControlEvents.editingDidBegin)
-        
         segmentType.selectedSegmentIndex = position_type
         
         if(gender == "male"){
@@ -66,7 +65,7 @@ class PremierApplicationController: UIViewController,ProtocolBranch {
     
     
     
-    func setBranch(selectedBranch: String, selectedBranchID: Int, objectBranch: ArrayBranch) {
+    func setBranch(selectedBranch: String, selectedBranchID: Int, objectSelectedBranch: ArrayBranch,arrayIndex: Int) {
         home_branch_id      = selectedBranchID
         txtBranch.text      = selectedBranch
     }
@@ -180,11 +179,22 @@ class PremierApplicationController: UIViewController,ProtocolBranch {
             .responseJSON { response in
                 do{
                     self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode    = try response.response?.statusCode else { return }
-                    print(statusCode)
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again", ifExit: false)
+                        return
+                    }
                     if response.data != nil{
                         if(statusCode == 200 || statusCode == 201){
                             self.showDialog(title: "Success!", message: "You have successfully applied for Premiere Loyalty Card. The process will take 2-3 weeks. We will notify you once the card is ready and you may claim it to your selected branch. \nThank you!", ifExit: true)
+                        }
+                        else if (statusCode == 401){
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            self.utilities.deleteAllData()
+                            let mainStoryboard: UIStoryboard = UIStoryboard(name: "LoginStoryboard", bundle: nil)
+                            let viewController = mainStoryboard.instantiateViewController(withIdentifier: "LoginController") as! LoginController
+                            viewController.isLoggedOut      = true
+                            viewController.sessionExpired   = true
+                            UIApplication.shared.keyWindow?.rootViewController = viewController
                         }
                         else{
                             let responseValue = response.result.value

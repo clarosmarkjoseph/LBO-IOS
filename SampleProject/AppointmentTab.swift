@@ -10,32 +10,34 @@ import UIKit
 import JTAppleCalendar
 import PopupDialog
 import Alamofire
-
+import EventKit
 
 class AppointmentTab: UIViewController,UITableViewDelegate,UITableViewDataSource {
    
     @IBOutlet weak var lblMonth: UILabel!
     @IBOutlet weak var lblYear: UILabel!
     @IBOutlet weak var calendarView: JTAppleCalendarView!
-    @IBOutlet weak var uiLogin: UIView!
-    @IBOutlet weak var uiAppointment: UIView!
     @IBOutlet var tblAppointment: UITableView!
     @IBOutlet var btnNext: UIButton!
     @IBOutlet var btnPrev: UIButton!
-    var ifTermsAgree = false
-    let utilities = Utilities()
-    let dbclass   = DatabaseHelper()
-    var client_id = 0
-    var date_selected = ""
-    var arrayLBOAppointment:[LBOAppointmentData]? =  [LBOAppointmentData]()
-    let dialogUtil = DialogUtility()
-    var SERVER_URL = ""
+    
+    let utilities           = Utilities()
+    let dbclass             = DatabaseHelper()
+    let dialogUtil          = DialogUtility()
+    var client_id           = 0
+    var SERVER_URL          = ""
+    var appointmentResult   = [AppointmentList]()
+    var stringDateSelected  = ""
+    var arrayDateOfAppointment:[String:String] = [:]
+    var ifLoaded            = false
+
+    
     lazy var refreshControl: UIRefreshControl = {
-        let refreshControl = UIRefreshControl()
-        refreshControl.tintColor        = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
-        refreshControl.attributedTitle  = NSAttributedString(string: "Get latest appointments.")
-        refreshControl.addTarget(self, action: #selector(handleRefresh(_:)), for: .valueChanged)
-        return refreshControl
+        let refresh = UIRefreshControl()
+        refresh.tintColor        = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+        refresh.attributedTitle  = NSAttributedString(string: "Loading...")
+        refresh.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
+        return refresh
     }()
     let dateFormatter:DateFormatter = {
         let formatter = DateFormatter()
@@ -55,79 +57,153 @@ class AppointmentTab: UIViewController,UITableViewDelegate,UITableViewDataSource
         tblAppointment.delegate         = self
         tblAppointment.dataSource       = self
         client_id                       = utilities.getUserID()
-        if(client_id <= 0){
-            uiLogin.isHidden        = false
-            uiAppointment.isHidden  = true
-        }
-        else{
-            uiLogin.isHidden        = true
-            uiAppointment.isHidden  = false
-            setupCalendarView()
-        }
+        
+        refreshControl.beginRefreshing()
+        setupCalendarView()
+        self.tblAppointment.isScrollEnabled         = true
+        self.tblAppointment.alwaysBounceVertical    = true
         self.tblAppointment.addSubview(refreshControl)
-        
-        
+        refreshControl.tag = 1
+        self.handleRefresh()
+        self.dialogUtil.showActivityIndicator(self.view)
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        GlobalVariables.sharedInstance.setAvailableServices(array: [Int]())
+        GlobalVariables.sharedInstance.setAvailableProducts(array: [Int]())
+        if(ifLoaded == true){
+            self.displayData(date_selected: stringDateSelected)
+        }
     }
     
     //pull to refresh
-    @objc func handleRefresh(_ handleRefresh: UIRefreshControl) {
-        refreshControl.beginRefreshing()
+    @objc func handleRefresh() {
         fetchAppointment()
     }
     
     //fetch appointment
     func fetchAppointment() {
-        
-        let client_id = utilities.getUserID()
-        self.dialogUtil.showActivityIndicator(self.view)
-        let promoURL = "\(SERVER_URL)/api/appointment/getAppointments/\(client_id)/allData"
-        Alamofire.request(promoURL, method: .get)
+        let client_id   = utilities.getUserID()
+        let url         = "\(SERVER_URL)/api/appointment/getAppointments/client/\(client_id)/allData"
+        Alamofire.request(url, method: .get)
             .responseJSON { response in
                 do{
-                    self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode    = try response.response?.statusCode else { return }
+                    guard let statusCode   = try response.response?.statusCode else {
+                        if self.dialogUtil.activityIndicator.isAnimating{
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                        }
+                        self.refreshControl.endRefreshing()
+                        return
+                    }
                     if let responseJSONData = response.data{
                         if(statusCode == 200 || statusCode == 201){
-                            
-                            do{
-                                let date_updated    = self.utilities.getCurrentDateTime(ifDateOrTime: "datetime")
-                                
-                                
-                                self.dbclass.insertOrUpdateAppointment(id: <#T##Int#>, status: <#T##String#>, objectData: <#T##String#>, date: <#T##String#>, date_updated: <#T##String#>)
-                               
-                                
-                            }
-                            catch{
-                                print("ERROR DB Branch \(error)")
-                            }
+                            self.dbclass.deleteAppointments()
+                            self.iterateResult(responseJSONData:responseJSONData)
                         }
                         else{
-//                            self.loadPromotions()
-                            let objectResponse = response.result.value as! Dictionary<String, Any>
-                            let arrayError = self.utilities.handleHttpResponseError(objectResponseError: objectResponse ,statusCode:statusCode)
-//                            self.showDialog(title:arrayError[0], message: arrayError[1])
+                            if self.dialogUtil.activityIndicator.isAnimating{
+                                self.dialogUtil.hideActivityIndicator(self.view)
+                            }
+                            self.refreshControl.endRefreshing()
+                            
                         }
                     }
                     else{
-                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
-                        
+                        if self.dialogUtil.activityIndicator.isAnimating{
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                        }
+                        self.refreshControl.endRefreshing()
                     }
                 }
                 catch{
-                    print(response.error)
-                    self.dialogUtil.hideActivityIndicator(self.view)
-                    self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                    if self.dialogUtil.activityIndicator.isAnimating{
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                    }
+                    self.refreshControl.endRefreshing()
                 }
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { // change 2 to desired number of seconds
-            self.tblAppointment.reloadData()
-            self.refreshControl.endRefreshing()
-        }
-    
-        
     }
     
+    
+    func iterateResult(responseJSONData:Data){
+        do{
+            let date_updated        = self.utilities.getCurrentDateTime(ifDateOrTime: "date")
+            let jsonDecoded         = try JSONDecoder().decode([AppointmentList].self, from: responseJSONData)
+            self.appointmentResult  = jsonDecoded
+    
+            for rows in appointmentResult{
+                var ifHasService            = false
+                let jsonDataObject          = try JSONEncoder().encode(rows)
+                let transaction_id          = rows.id!
+                let transaction_status      = rows.transaction_status!
+                let technician_name         = rows.technician_name ?? "N/A"
+                let transaction_datetime    = rows.transaction_datetime!
+                let branch_name             = rows.branch_name!
+                let start_time              = utilities.convertStringToDateTime(stringDate: transaction_datetime)
+                let transaction_items       = rows.items
+                var end_time                = start_time
+               
+                dateFormatter.dateFormat    = "yyyy-MM-dd"
+                let appointment_date        = utilities.convertStringToDate(stringDate: dateFormatter.string(from: start_time))
+                let currentDate             = utilities.convertStringToDate(stringDate: utilities.getCurrentDateTime(ifDateOrTime: "date"))
+                
+                self.dbclass.insertOrUpdateAppointment(id: transaction_id, status: transaction_status, objectData: self.utilities.convertDataToJSONString(data: jsonDataObject), date: transaction_datetime, date_updated: date_updated)
+                let stringDate    = utilities.removeTimeFromDatetime(stringDateTime: transaction_datetime)
+                self.arrayDateOfAppointment[stringDate] = stringDate
+                
+                for row in transaction_items!{
+                    let item_type = row.item_type
+                    if item_type == "service"{
+                        ifHasService    = true
+                        end_time        = utilities.convertStringToDateTime(stringDate: row.book_end_time!)
+                    }
+                }
+                
+//                if(transaction_status == "reserved"){
+//                    if ifHasService == true{
+////                        if(ifEventPermissionGranted == true){
+////                            print("\(currentDate.compare(appointment_date))")
+////                            if(currentDate.compare(appointment_date) == .orderedAscending || currentDate.compare(appointment_date) == .orderedSame){
+////                                self.addCalendarEvent(withtitle: "Appointment Booking", eventStartDate: start_time, eventEndDate: end_time, branchName: branch_name, status: transaction_status, technician: technician_name)
+////                            }
+////                        }
+//                    }
+//                }
+            }
+            
+            calendarView.reloadData()
+            displayData(date_selected: stringDateSelected)
+        }
+        catch{
+            print("WEW: \(error)")
+        }
+    }
+    
+    func displayData(date_selected:String){
+        
+        appointmentResult.removeAll()
+        let appointment_tbl = dbclass.appointment_tbl
+        do{
+            let filterUpdate = appointment_tbl.filter(dbclass.appointment_date.like("\(date_selected)%"))
+            let query        = try dbclass.db!.prepare(filterUpdate)
+
+            for rows in query {
+                let objectRows  = try rows.get(dbclass.appointment_object)
+                let jsonData    = objectRows.data(using: .utf8)
+                let jsonDecoded = try JSONDecoder().decode(AppointmentList.self, from: jsonData!)
+                appointmentResult.append(jsonDecoded)
+            }
+            if self.dialogUtil.activityIndicator.isAnimating{
+                self.dialogUtil.hideActivityIndicator(self.view)
+            }
+            self.refreshControl.endRefreshing()
+            self.tblAppointment.reloadData()
+            ifLoaded = true
+        }
+        catch{
+            print("ERROR appointment Date: \(error)")
+        }
+    }
     
     func showDialog(title:String,message:String){
         //alert box
@@ -139,64 +215,6 @@ class AppointmentTab: UIViewController,UITableViewDelegate,UITableViewDataSource
         alertView.addAction(confirm)
         present(alertView,animated: true,completion: nil)
     }
-    
-
-    func setupCalendarView(){
-        
-        calendarView.minimumLineSpacing         = 0
-        calendarView.minimumInteritemSpacing    = 0
-        
-        calendarView.calendarDelegate   = self
-        calendarView.calendarDataSource = self
-        
-        calendarView.scrollToDate(Date(),animateScroll:false)
-        calendarView.selectDates([Date()])
-        calendarView.visibleDates{ visibleDates in
-            self.setupViewsOfCalendar(from:visibleDates)
-        }
-
-    }
-    
-    func setupViewsOfCalendar(from visibleDates:DateSegmentInfo){
-        let date = visibleDates.monthDates.first!.date
-        dateFormatter.dateFormat = "MMMM"
-        lblMonth.text = dateFormatter.string(from: date)
-        
-        dateFormatter.dateFormat = "yyyy"
-        lblYear.text = dateFormatter.string(from: date)
-    }
-
-    func handleCellTextColor(cell:CustomCalendarViewCell, cellState:CellState){
-        
-        let todaysDate       = Date()
-        dateFormatter.dateFormat = "yyyy MM dd"
-        let todaysDateString = dateFormatter.string(from: todaysDate)
-        let monthDateString  = dateFormatter.string(from: cellState.date)
-
-        if cellState.isSelected{
-            cell.lblDate.textColor     = UIColor.lightGray
-        }
-        else{
-            if(cellState.dateBelongsTo == .thisMonth){
-                cell.lblDate.textColor     = UIColor.black
-            }
-            else{
-                cell.lblDate.textColor     =  UIColor.lightGray
-            }
-        }
-    }
-
-
-    func handleCellSelected(cell:CustomCalendarViewCell, cellState:CellState){
-       
-        if cell.isSelected {
-            cell.selectedView.isHidden = false
-        }
-        else{
-            cell.selectedView.isHidden = true
-        }
-    }
-    
     
     @IBAction func showPrev(_ sender: Any) {
         calendarView.scrollToSegment(.previous)
@@ -223,16 +241,70 @@ class AppointmentTab: UIViewController,UITableViewDelegate,UITableViewDataSource
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return (arrayLBOAppointment?.count)!
+        
+        if appointmentResult.count <= 0{
+            var emptyLabel = UILabel(frame: CGRect(x: 0, y: 0, width: self.view.bounds.size.width, height: self.view.bounds.size.height))
+            emptyLabel.text             = "No appointment on this day.\n\n Click (+) to add item"
+            emptyLabel.textColor        = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+            emptyLabel.numberOfLines    = 0
+            emptyLabel.textAlignment    = NSTextAlignment.center
+            self.tblAppointment.backgroundView = emptyLabel
+            self.tblAppointment.separatorStyle = UITableViewCellSeparatorStyle.none
+            return 0
+        }
+        else {
+            self.tblAppointment.backgroundView = nil
+            return appointmentResult.count
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
+        (view as? UITableViewHeaderFooterView)?.textLabel?.textColor = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tblAppointment.dequeueReusableCell(withIdentifier: "cellAppointmentCalendar") as!
         AppointmentCalendarDetails
+        let position = indexPath.row
+        let dateTime            = appointmentResult[position].transaction_datetime!
+        let dateOnly            = utilities.removeTimeFromDatetime(stringDateTime: dateTime)
+        let timeOnly            = utilities.removeDateFromDatetime(stringDateTime: dateTime)
         
+        let branch_name         = appointmentResult[position].branch_name ?? "N/A"
+        let tech_name           = appointmentResult[position].technician_name ?? "No Technician"
+        let status              = appointmentResult[position].transaction_status
+        
+        cell.lblDate.text       = utilities.getCompleteDateString(stringDate: dateOnly)
+        cell.lblTime.text       = utilities.getStandardTime(stringTime: timeOnly)
+        cell.lblBranch.text     = branch_name
+        cell.lblTechnician.text = tech_name
+        cell.lblStatus.text     = status?.capitalized
+        
+        if(status == "completed"){
+            cell.lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
+        }
+        else if(status == "reserved"){
+            cell.lblStatus.backgroundColor = #colorLiteral(red: 0.1960784314, green: 0.7725490196, blue: 0.8235294118, alpha: 1)
+        }
+        else if(status == "expired"){
+            cell.lblStatus.backgroundColor = #colorLiteral(red: 1, green: 0.7450980392, blue: 0, alpha: 1)
+        }
+        else if(status == "cancelled"){
+            cell.lblStatus.backgroundColor = UIColor.red
+        }
         return cell
-        
     }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        if let index = self.tblAppointment.indexPathForSelectedRow{
+            self.tblAppointment.deselectRow(at: index, animated: true)
+        }
+        let storyBoard = UIStoryboard(name:"AppointmentStoryboard",bundle:nil)
+        let appointmentVC  = storyBoard.instantiateViewController(withIdentifier: "AppointmentDetailsController") as! AppointmentDetailsController
+        appointmentVC.objectDetails  = appointmentResult[indexPath.row]
+        self.navigationController?.pushViewController(appointmentVC, animated: true)
+    }
+    
     
     @IBAction func btnPress(_ sender: Any) {
         showSheetView()
@@ -240,19 +312,18 @@ class AppointmentTab: UIViewController,UITableViewDelegate,UITableViewDataSource
     
     func showSheetView(){
         let alertView = UIAlertController(title: "Select Action", message: "What would you like to do? ", preferredStyle: .actionSheet)
-        
+        let btnAppointment          = UIAlertAction(title: "Book Appointment ", style: .default) { (action) in
+            self.validateAppointment()
+        }
+//        let btnViewAppointmentList = UIAlertAction(title: "View Appoinment List", style: .default) { (action) in
+//            self.validateAppointment()
+//        }
         let btnEvent = UIAlertAction(title: "Create Event / Reminders", style: .default) { (action) in
             let alert = UIAlertController(title: "Not Available", message: "Sorry, this feature is not yet available", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "Confirm", style: .default, handler: nil))
             self.present(alert, animated: true, completion: nil)
         }
-        let btnAppointment = UIAlertAction(title: "Book Appointment ", style: .default) { (action) in
-            let storyBoard = UIStoryboard(name:"AppointmentStoryboard",bundle:nil)
-            let appointmentVC  = storyBoard.instantiateViewController(withIdentifier: "AppointmentFirstViewController") as! AppointmentFirstViewController
-            appointmentVC.app_reserved  = self.date_selected
-            self.navigationController?.pushViewController(appointmentVC, animated: true)
-            self.tabBarController?.tabBar.isHidden = true
-        }
+        
         let cancel = UIAlertAction(title: "Cancel", style: .cancel) { (action) in
             
         }
@@ -262,23 +333,111 @@ class AppointmentTab: UIViewController,UITableViewDelegate,UITableViewDataSource
         present(alertView,animated: true,completion: nil)
     }
     
-    override func viewDidAppear(_ animated: Bool) {
-        self.tabBarController?.tabBar.isHidden = false
+    
+    func validateAppointment(){
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let selected_date       = dateFormatter.date(from: stringDateSelected)!
+        let currentDateString   = utilities.getCurrentDateTime(ifDateOrTime: "date")
+        let today_date          = dateFormatter.date(from: currentDateString)
+        
+        if (today_date!.compare(selected_date) == .orderedSame) || (today_date!.compare(selected_date) == .orderedAscending){
+            if checkIfAppointmentExist() == true{
+                self.showDialog(title: "Already have appointment", message: "Sorry, you already have pending appointment. Please finish your appointment or cancel it first.")
+            }
+            else{
+                showAppointment()
+            }
+        }
+        else{
+            self.showDialog(title: "Date is not available.", message: "Sorry, the selected date must equal or greater than current date.")
+        }
     }
     
+    func checkIfAppointmentExist() -> Bool{
+        
+        if appointmentResult.count > 0{
+            for rows in appointmentResult{
+                let status = rows.transaction_status
+                if status == "reserved"{
+                    return true
+                }
+            }
+            return false
+        }
+        return false
+    }
+    
+    func showAppointment(){
+        print("currentDateTime same as selected date")
+        let storyBoard = UIStoryboard(name:"AppointmentStoryboard",bundle:nil)
+        let appointmentVC  = storyBoard.instantiateViewController(withIdentifier: "AppointmentFirstViewController") as! AppointmentFirstViewController
+        appointmentVC.app_reserved  = self.stringDateSelected
+        self.navigationController?.pushViewController(appointmentVC, animated: true)
+    }
+    
+    func setupCalendarView(){
+        
+        calendarView.minimumLineSpacing         = 0
+        calendarView.minimumInteritemSpacing    = 0
+        
+        calendarView.calendarDelegate   = self
+        calendarView.calendarDataSource = self
+        
+        calendarView.scrollToDate(Date(),animateScroll:false)
+        calendarView.selectDates([Date()])
+        calendarView.visibleDates{ visibleDates in
+            self.setupViewsOfCalendar(from:visibleDates)
+        }
+    }
+    
+    //configuration of calendar cell
+    func configureCell(cell:JTAppleCell?, cellState:CellState){
+        guard let myCustomcell      = cell as? CustomCalendarViewCell else{ return }
+        dateFormatter.dateFormat    = "yyyy MM dd"
+        handleCellTextColor(cell: myCustomcell, cellState: cellState)
+        handleCellVisibility(cell: myCustomcell, cellState: cellState)
+        handleCellSelection(cell: myCustomcell, cellState: cellState)
+        handleCellEvents(cell: myCustomcell, cellState: cellState)
+    }
+    
+    func handleCellTextColor(cell:CustomCalendarViewCell, cellState:CellState){
+        let todaysDate       = Date()
+        dateFormatter.dateFormat = "yyyy MM dd"
+        let todaysDateString = dateFormatter.string(from: todaysDate)
+        let monthDateString  = dateFormatter.string(from: cellState.date)
+        
+        if todaysDateString == monthDateString{
+            cell.lblDate.textColor              = UIColor.black
+            cell.selectedView.backgroundColor   = UIColor.brown
+        }
+        else{
+            cell.lblDate.textColor = cellState.isSelected ? UIColor.white : UIColor.black
+        }
+    }
+    
+    func handleCellVisibility(cell:CustomCalendarViewCell, cellState:CellState){
+
+        cell.isHidden = cellState.dateBelongsTo == .thisMonth ? false : true
+    }
+    
+    func handleCellSelection(cell:CustomCalendarViewCell, cellState:CellState){
+        cell.selectedView.isHidden = cellState.isSelected  ? false : true
+    }
+    
+    func handleCellEvents(cell:CustomCalendarViewCell, cellState:CellState){
+       
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        cell.uiviewEvent.isHidden = !arrayDateOfAppointment.contains( where: {$0.key == dateFormatter.string(from: cellState.date)} )
+    }
     
     
 }
 
 
-extension AppointmentTab:JTAppleCalendarViewDataSource{
-    
-    
-    func calendar(_ calendar: JTAppleCalendarView, willDisplay cell: JTAppleCell, forItemAt date: Date, cellState: CellState, indexPath: IndexPath) {
-
-    }
-    
+extension AppointmentTab:JTAppleCalendarViewDataSource,JTAppleCalendarViewDelegate{
+   
     func configureCalendar(_ calendar: JTAppleCalendarView) -> ConfigurationParameters {
+        dateFormatter.dateFormat = "yyyy MM dd"
         let startDate       = dateFormatter.date(from: "2017 01 01")
         var dateComponent   = DateComponents()
         dateComponent.month = 6
@@ -287,50 +446,57 @@ extension AppointmentTab:JTAppleCalendarViewDataSource{
         return parameters
     }
     
-    func calendar(_ calendar: JTAppleCalendarView, didScrollToDateSegmentWith visibleDates: DateSegmentInfo) {
-        setupViewsOfCalendar(from: visibleDates)
-    }
-
-}
-
-extension AppointmentTab:JTAppleCalendarViewDelegate{
-    
     func calendar(_ calendar: JTAppleCalendarView, cellForItemAt date: Date, cellState: CellState, indexPath: IndexPath) -> JTAppleCell {
-        let cell = calendar.dequeueReusableJTAppleCell(withReuseIdentifier: "CustomCalendarViewCell", for: indexPath) as! CustomCalendarViewCell
-        cell.lblDate.text = cellState.text
         
-        handleCellSelected(cell: cell, cellState: cellState)
-        handleCellTextColor(cell: cell, cellState: cellState)
-    
-        return cell
+        let validCell = calendar.dequeueReusableJTAppleCell(withReuseIdentifier: "CustomCalendarViewCell", for: indexPath) as! CustomCalendarViewCell
+        validCell.lblDate.text = cellState.text
+        configureCell(cell: validCell, cellState: cellState)
+        return validCell
     }
     
     func calendar(_ calendar: JTAppleCalendarView, didSelectDate date: Date, cell: JTAppleCell?, cellState: CellState) {
-        guard let validCell = cell as? CustomCalendarViewCell else { return }
-        handleCellSelected(cell: validCell, cellState: cellState)
-        handleCellTextColor(cell: validCell, cellState: cellState)
-       
-        let formatter           = DateFormatter()
-        formatter.dateFormat    = "yyyy-MM-dd"
-        date_selected           = formatter.string(from: cellState.date)
-  
-        if(cellState.dateBelongsTo == .followingMonthOutsideBoundary || cellState.dateBelongsTo == .followingMonthWithinBoundary){
-            calendarView.scrollToSegment(.next)
-        }
-        
-        if(cellState.dateBelongsTo == .previousMonthWithinBoundary || cellState.dateBelongsTo == .previousMonthOutsideBoundary){
-            calendarView.scrollToSegment(.previous)
-        }
-        
+        configureCell(cell: cell, cellState: cellState)
+        dateFormatter.dateFormat    = "yyyy-MM-dd"
+        stringDateSelected = dateFormatter.string(from: date)
+        displayData(date_selected: stringDateSelected)
     }
     
     func calendar(_ calendar: JTAppleCalendarView, didDeselectDate date: Date, cell: JTAppleCell?, cellState: CellState) {
-        guard let validCell = cell as? CustomCalendarViewCell else { return }
-        handleCellSelected(cell: validCell, cellState: cellState)
-        handleCellTextColor(cell: validCell, cellState: cellState)
+         configureCell(cell: cell, cellState: cellState)
     }
     
+
+    func calendar(_ calendar: JTAppleCalendarView, didScrollToDateSegmentWith visibleDates: DateSegmentInfo) {
+        setupViewsOfCalendar(from: visibleDates)
+    }
     
+    func setupViewsOfCalendar(from visibleDates:DateSegmentInfo){
+        let date = visibleDates.monthDates.first!.date
+        dateFormatter.dateFormat = "MMMM"
+        lblMonth.text = dateFormatter.string(from: date)
+        
+        dateFormatter.dateFormat = "yyyy"
+        lblYear.text = dateFormatter.string(from: date)
+    }
+    
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return "Appointment on this day"
+    }
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 130
+    }
+    
+    func calendar(_ calendar: JTAppleCalendarView, willDisplay cell: JTAppleCell, forItemAt date: Date, cellState: CellState, indexPath: IndexPath) {
+        
+    }
     
 }
+
+
+
+
+
+
+
+
 

@@ -42,7 +42,7 @@ class PackagesSegmentController: UIViewController,UITableViewDelegate,UITableVie
                 let arrayStringPackage  = queryPackage[dbclass.package_array]
                 let jsonData            = arrayStringPackage.data(using: .utf8)
                 let resultPackages      = try JSONDecoder().decode([ArrayPackage].self, from: jsonData!)
-                if(clientGender != nil){
+                if(clientGender != ""){
                     modelPackages = [ArrayPackage]()
                     for rows in resultPackages{
                         let resGender = rows.package_gender
@@ -78,7 +78,7 @@ class PackagesSegmentController: UIViewController,UITableViewDelegate,UITableVie
         
         cell.lblServiceName.text    = service_name
         cell.lblServiceDesc.text    = service_desc
-        cell.lblServicePrice.text   = "Php \(service_price)"
+        cell.lblServicePrice.text   = utilities.convertToStringCurrency(value: "\(service_price)")
         cell.imgServiceGender.image = UIImage(named: service_gender)
         cell.imgServicePackage.kf.setImage(with: myURL)
         

@@ -25,14 +25,15 @@ class PremiereLoyaltyClientController: UIViewController {
     @IBOutlet var btnPLCApplication: UIButton!
     @IBOutlet var btnViewList: UIBarButtonItem!
     
-    
     var dbclass     = DatabaseHelper()
     var utilities   = Utilities()
     var dialogUtil  = DialogUtility()
     var SERVER_URL  = ""
-    var total_transaction = 10.0
+    var total_transaction = 0.0
     var total_discount    = 0.0
     var position_status   = 0
+    var isLoaded          = false
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -41,15 +42,12 @@ class PremiereLoyaltyClientController: UIViewController {
 
     
     override func viewDidAppear(_ animated: Bool) {
-         AppDelegate.AppUtility.lockOrientation(UIInterfaceOrientationMask.portrait, andRotateTo: UIInterfaceOrientation.portrait)
-        if(animated){
+        AppDelegate.AppUtility.lockOrientation(UIInterfaceOrientationMask.portrait, andRotateTo: UIInterfaceOrientation.portrait)
+        if(isLoaded == false){
+            isLoaded = true
             computeTotalTransactions()
         }
     }
-    
-
-    
-    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         
@@ -57,7 +55,7 @@ class PremiereLoyaltyClientController: UIViewController {
     
     func computeTotalTransactions(){
         do{
-            total_transaction = 10.0
+            total_transaction = 0.0
             total_discount    = 0.0
             
             self.dialogUtil.showActivityIndicator(self.view)
@@ -67,12 +65,11 @@ class PremiereLoyaltyClientController: UIViewController {
             let transactions        = objectUser.transaction_data
             let jsonTransactionData = transactions?.data(using: .utf8)
             let arrayTransactions   = try JSONDecoder().decode([ArrayUserTransactionData].self, from: jsonTransactionData!)
-           
-            
             for rows in arrayTransactions{
                 var net_amount            = utilities.getNumberValueInString(stringValue: "\(rows.net_amount)")
+                let discountString        = utilities.getNumberValueInString(stringValue: "\(rows.price_discount)")
                 let transaction_price     = Double(net_amount)!
-                let transaction_discount  = Double(rows.price_discount!)
+                let transaction_discount  = Double(discountString)
                 total_transaction+=transaction_price
                 total_discount+=transaction_discount ?? 0.0
             }
@@ -82,7 +79,7 @@ class PremiereLoyaltyClientController: UIViewController {
             lblDiscountPrice.text   = utilities.convertToStringCurrency(value: "\(total_discount)")
             lblNetPrice.text   = utilities.convertToStringCurrency(value: "\(total_transaction)")
             
-            self.dialogUtil.hideActivityIndicator(self.view)
+           
             loadPremiereApplications()
         }
         catch{
@@ -98,15 +95,18 @@ class PremiereLoyaltyClientController: UIViewController {
         Alamofire.request(urlTransaction, method: .get)
             .responseJSON { response in
                 do{
-                    self.dialogUtil.hideActivityIndicator(self.view)
-                    guard let statusCode   = try response.response?.statusCode else { return }
+                    guard let statusCode   = try response.response?.statusCode else {
+                        self.dialogUtil.hideActivityIndicator(self.view)
+                        self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
+                        return
+                    }
+                    
                     if let responseJSONData = response.data{
                         if(statusCode == 200 || statusCode == 201){
                             //success
                             let objectResponse      = try JSONDecoder().decode(PremiereAndRequest.self, from: responseJSONData)
                             let currentDatetime     = self.utilities.getCurrentDateTime(ifDateOrTime: "datetime")
                             do{
-                                
                                 let jsonEncodedPremier  = try JSONEncoder().encode(objectResponse.application)
                                 let jsonEncodedRequest  = try JSONEncoder().encode(objectResponse.request)
                                 let premiere_tbl        = self.dbclass.premiere_tbl
@@ -115,7 +115,6 @@ class PremiereLoyaltyClientController: UIViewController {
                                 let countApplication    = try self.dbclass.db?.scalar(premiere_tbl.count) ?? 0
                                 let arrayPremiereString = self.utilities.convertDataToJSONString(data: jsonEncodedPremier)
                                 let arrayRequestString  = self.utilities.convertDataToJSONString(data: jsonEncodedRequest)
-                                
                                 if(countRequest <= 0){
                                     self.dbclass.insertPremiere(arrayString: arrayPremiereString, date_updated: currentDatetime)
                                 }
@@ -136,6 +135,15 @@ class PremiereLoyaltyClientController: UIViewController {
                                 print("ERROR: \(error)")
                                 self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
                             }
+                        }
+                        else if(statusCode == 401){
+                            self.dialogUtil.hideActivityIndicator(self.view)
+                            self.utilities.deleteAllData()
+                            let mainStoryboard: UIStoryboard = UIStoryboard(name: "LoginStoryboard", bundle: nil)
+                            let viewController = mainStoryboard.instantiateViewController(withIdentifier: "LoginController") as! LoginController
+                            viewController.isLoggedOut      = true
+                            viewController.sessionExpired   = true
+                            UIApplication.shared.keyWindow?.rootViewController = viewController
                         }
                         else{
                             self.dialogUtil.hideActivityIndicator(self.view)
@@ -200,6 +208,7 @@ class PremiereLoyaltyClientController: UIViewController {
                         }
                         if(premiere_status == "picked_up"){
                             caption = self.utilities.getPLCCaption(index: 6)
+                            
                             status  = "Already Picked-Up"
                             position_status = 1
                             self.lblPremiereStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
@@ -259,7 +268,7 @@ class PremiereLoyaltyClientController: UIViewController {
                     self.lblPremiereStatus.backgroundColor  = #colorLiteral(red: 0.1058823529, green: 0.737254902, blue: 0.6078431373, alpha: 1)
                 }
             }
-            self.nextStep(status: status.capitalized, caption: caption.capitalized)
+            self.nextStep(status: status.capitalized, caption: caption)
 
         }
         catch{
@@ -271,6 +280,7 @@ class PremiereLoyaltyClientController: UIViewController {
             self.showDialog(title: "Error!", message: "There was a problem connecting to Lay Bare App. Please check your connection and try again")
         }
     }
+  
     
     func nextStep(status:String,caption:String){
         
@@ -285,48 +295,10 @@ class PremiereLoyaltyClientController: UIViewController {
             btnPLCApplication.isEnabled = false
             btnPLCApplication.alpha     = 0.5
             applicationBtnText          = "Replacement is not available"
-            applicationTitle            = "Premiere Loyalty Card"
+            applicationTitle            = "Premier Loyalty Card"
             btnPLCApplication.setTitle(applicationBtnText, for:.normal)
-        }
-        if(position_status == 1){
-            //show loyalty virtual card & will allow applying for a new/replacement
-            uiviewCard.isHidden = false
-            applicationTitle    = "Premiere Loyalty Card"
-            applicationBtnText  = "Apply for PLC Replacement"
-            btnPLCApplication.setTitle(applicationBtnText, for:.normal)
-        }
-       
-        if(position_status == 3){
-             // Status: ready (mark plc as picked - up)
-            uiviewCard.isHidden = false
-            applicationTitle    = "Premiere Loyalty Card - Card is ready."
-            applicationBtnText  = "Mark Card as Picked-up!"
-            btnPLCApplication.setTitle(applicationBtnText, for:.normal)
-        }
-        if(position_status == 4){
-            //not qualified(message will changed) & redirect to transaction request
-            uiviewCard.isHidden = true
-            applicationTitle    = "Premiere Loyalty Card - More transaction"
-            applicationBtnText  = "Request for Transaction Review"
-            btnPLCApplication.setTitle(applicationBtnText, for:.normal)
-        }
-        if(position_status == 5){
-            //qualified but no premier application yet
-            uiviewCard.isHidden = true
-            applicationTitle    = "Premiere Loyalty Card -Qualified!"
-            applicationBtnText  = "Apply for Premiere Loyalty Card"
-            btnPLCApplication.setTitle(applicationBtnText, for:.normal)
-        }
-        if(position_status == 6){
-            //qualified but no premier application yet
-            uiviewCard.isHidden = true
-            applicationTitle    = "Premiere Loyalty Card - Application error!"
-            applicationBtnText  = "Please try again!"
-            btnPLCApplication.setTitle(applicationBtnText, for: .disabled)
-            btnPLCApplication.alpha = 0.5
         }
         
-        lblApplicationContent.text  = caption
         if(position_status == 2){
             //special position for denied & deleted (Check transaction if meet)
             applicationTitle    = "PLC Previous application: \(status)"
@@ -339,14 +311,54 @@ class PremiereLoyaltyClientController: UIViewController {
             }
             else{
                 captionDenied += "\n\n\(self.utilities.getPLCCaption(index: 1))"
-                applicationBtnText  = "Apply for Premiere Loyalty Card"
+                applicationBtnText  = "Apply for Premier Loyalty Card"
                 position_status = 5
             }
             lblApplicationContent.text = captionDenied
             btnPLCApplication.setTitle(applicationBtnText, for:.normal)
         }
+        else{
+            if(position_status == 1){
+                //show loyalty virtual card & will allow applying for a new/replacement
+                uiviewCard.isHidden = false
+                applicationTitle    = "Premier Loyalty Card"
+                applicationBtnText  = "Apply for PLC Replacement"
+                btnPLCApplication.setTitle(applicationBtnText, for:.normal)
+            }
+            if(position_status == 3){
+                // Status: ready (mark plc as picked - up)
+                uiviewCard.isHidden = false
+                applicationTitle    = "Premier Loyalty Card - Card is ready."
+                applicationBtnText  = "Mark Card as Picked-up!"
+                btnPLCApplication.setTitle(applicationBtnText, for:.normal)
+            }
+            if(position_status == 4){
+                //not qualified(message will changed) & redirect to transaction request
+                uiviewCard.isHidden = true
+                applicationTitle    = "Premier Loyalty Card - More transaction"
+                applicationBtnText  = "Request for Transaction Review"
+                btnPLCApplication.setTitle(applicationBtnText, for:.normal)
+            }
+            if(position_status == 5){
+                //qualified but no premier application yet
+                uiviewCard.isHidden = true
+                applicationTitle    = "Premier Loyalty Card -Qualified!"
+                applicationBtnText  = "Apply for Premier Loyalty Card"
+                btnPLCApplication.setTitle(applicationBtnText, for:.normal)
+            }
+            if(position_status == 6){
+                //qualified but no premier application yet
+                uiviewCard.isHidden = true
+                applicationTitle    = "Premier Loyalty Card - Application error!"
+                applicationBtnText  = "Please try again!"
+                btnPLCApplication.setTitle(applicationBtnText, for: .disabled)
+                btnPLCApplication.alpha = 0.5
+            }
+            lblApplicationContent.text  = caption
+        }
         lblApplicationTitle.text    = applicationTitle
         uiviewApplication.isHidden  = false
+        self.dialogUtil.hideActivityIndicator(self.view)
     }
     
     //Top Button
@@ -372,6 +384,9 @@ class PremiereLoyaltyClientController: UIViewController {
         
         if(position_status == 4){
             //transaction request
+            let storyBoard = UIStoryboard(name:"PremiereStoryboard",bundle:nil)
+            let requestVC  = storyBoard.instantiateViewController(withIdentifier: "TransactionRequestController") as! TransactionRequestController
+            self.navigationController?.pushViewController(requestVC, animated: true)
         }
         if(position_status == 5 ){
             //application
@@ -387,10 +402,7 @@ class PremiereLoyaltyClientController: UIViewController {
             applicationVC.position_type = 1
             self.navigationController?.pushViewController(applicationVC, animated: true)
         }
-        
-        
     }
-    
     
     //card (2nd UI)
     @IBAction func cardAction(_ sender: Any) {
@@ -399,9 +411,6 @@ class PremiereLoyaltyClientController: UIViewController {
         self.navigationController?.isNavigationBarHidden    = true
         self.navigationController?.pushViewController(cardPreviewVC, animated: true)
     }
-    
-
-    
     
     func showDialog(title:String,message:String){
         //alert box

@@ -13,6 +13,7 @@ class CustomCalendarViewCell: JTAppleCell {
     
     @IBOutlet weak var lblDate: UILabel!
     @IBOutlet weak var selectedView: UIView!
+    @IBOutlet var uiviewEvent: UIView!
     
     
 }

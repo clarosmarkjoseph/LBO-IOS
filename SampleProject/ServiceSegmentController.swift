@@ -25,36 +25,53 @@ class ServiceSegmentController:UIViewController,UITableViewDelegate,UITableViewD
     var viewType     = ""
     var clientGender = ""
     var delegateAppointment:ProtocolAddItem? = nil
+    var arrayServices       = [Int]()
     
     override func viewDidLoad() {
         tblServicePackage.delegate      = self
         tblServicePackage.dataSource    = self
         SERVER_URL                      = dbclass.returnIp()
         clientGender                    = utilities.getUserGender()
+        arrayServices                   = GlobalVariables.sharedInstance.getAvailableServices()
+        print("array: \(arrayServices)")
         loadServices()
         super.viewDidLoad()
+        
     }
 
     func loadServices() {
         self.dialogUtils.showActivityIndicator(self.view)
         let service_tbl = dbclass.service_tbl
         do{
+            modelServices = [ArrayServices]()
             if let queryServices = try dbclass.db?.pluck(service_tbl) {
                 let arrayStringServices = queryServices[dbclass.service_array]
                 let jsonData            = arrayStringServices.data(using: .utf8)
                 let resultServices      = try JSONDecoder().decode([ArrayServices].self, from: jsonData!)
-                if(clientGender != nil){
-                    modelServices = [ArrayServices]()
+                if(clientGender != ""){
                     for rows in resultServices{
                         let resGender = rows.service_gender
-                        if(clientGender.lowercased() == resGender?.lowercased()){
-                            modelServices.append(rows)
+                        let id = rows.id ?? 0
+                        if(arrayServices.count > 0){
+                            if(arrayServices.contains(where: {$0 == id})){
+                                if(clientGender.lowercased() == resGender?.lowercased()){
+                                    modelServices.append(rows)
+                                }
+                            }
+                        }
+                        else{
+                            if(clientGender.lowercased() == resGender?.lowercased()){
+                                modelServices.append(rows)
+                            }
                         }
                     }
                 }
                 else{
                     modelServices = resultServices
                 }
+                modelServices = modelServices.sorted(by: {
+                    ($0.service_name )! < ($1.service_name)!
+                })
             }
             self.dialogUtils.hideActivityIndicator(self.view)
         }
@@ -79,7 +96,7 @@ class ServiceSegmentController:UIViewController,UITableViewDelegate,UITableViewD
         
         cell.lblServiceName.text    = service_name
         cell.lblServiceDesc.text    = service_desc
-        cell.lblServicePrice.text   = "Php \(service_price)"
+        cell.lblServicePrice.text   = utilities.convertToStringCurrency(value: "\(service_price)")
         cell.imgServiceGender.image = UIImage(named: service_gender)
         cell.imgServicePackage.kf.setImage(with: myURL)
         

@@ -13,6 +13,7 @@ class TermConditionViewController: UIViewController {
 
     var stringTerms = ""
     var ifTermsAgreed = false
+    var delegate:ProtocolForSignup? = nil
     @IBOutlet weak var lblTerms: UILabel!
     @IBOutlet weak var uiViewContent: UIView!
     
@@ -37,11 +38,13 @@ class TermConditionViewController: UIViewController {
     }
     
     @IBAction func cancelTerms(_ sender: Any) {
+        delegate?.setupAgreement(isAgreed:false)
         self.dismiss(animated: true, completion: nil)
     }
     
     @IBAction func agreeTerms(_ sender: Any) {
-         self.dismiss(animated: true, completion: nil)
+        delegate?.setupAgreement(isAgreed:true)
+        self.dismiss(animated: true, completion: nil)
     }
     
     override func didReceiveMemoryWarning() {

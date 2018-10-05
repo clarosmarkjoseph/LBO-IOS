@@ -12,7 +12,6 @@ class PremiereHistoryController: UIViewController,UITableViewDelegate,UITableVie
 
     @IBOutlet var segmentTabs: UISegmentedControl!
     @IBOutlet var tblHistory: UITableView!
-
     let dialogUtil          = DialogUtility()
     let utilities           = Utilities()
     let dbclass             = DatabaseHelper()
@@ -85,10 +84,38 @@ class PremiereHistoryController: UIViewController,UITableViewDelegate,UITableVie
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         let index = segmentTabs.selectedSegmentIndex
         if(index == 0){
-            return arrayApplication.count
+            if arrayApplication.count <= 0{
+                var emptyLabel = UILabel(frame: CGRect(x: 0, y: 0, width: self.view.bounds.size.width, height: self.view.bounds.size.height))
+                emptyLabel.text             = "No record(s) found"
+                emptyLabel.textColor        = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+                emptyLabel.numberOfLines    = 0
+                emptyLabel.textAlignment    = NSTextAlignment.center
+                self.tblHistory.backgroundView = emptyLabel
+                self.tblHistory.separatorStyle = UITableViewCellSeparatorStyle.none
+                return 0
+            }
+            else {
+                self.tblHistory.backgroundView = nil
+                return arrayApplication.count
+            }
+            
         }
         else{
-            return arrayRequest.count
+            if arrayRequest.count <= 0{
+                var emptyLabel = UILabel(frame: CGRect(x: 0, y: 0, width: self.view.bounds.size.width, height: self.view.bounds.size.height))
+                emptyLabel.text             = "No record(s) found"
+                emptyLabel.textColor        = #colorLiteral(red: 0.4666666667, green: 0.2549019608, blue: 0.003921568627, alpha: 1)
+                emptyLabel.numberOfLines    = 0
+                emptyLabel.textAlignment    = NSTextAlignment.center
+                self.tblHistory.backgroundView = emptyLabel
+                self.tblHistory.separatorStyle = UITableViewCellSeparatorStyle.none
+                return 0
+            }
+            else {
+                self.tblHistory.backgroundView = nil
+                return arrayRequest.count
+            }
+            
         }
     }
     
@@ -99,18 +126,31 @@ class PremiereHistoryController: UIViewController,UITableViewDelegate,UITableVie
         if(indexTab == 0){
             let date    = arrayApplication[indexPath.row].created_at!
             let branch  = arrayApplication[indexPath.row].branch_name!
-            let status  = arrayApplication[indexPath.row].status!
+            var status  = arrayApplication[indexPath.row].status!
             let gender  = utilities.getUserGender()
             let dateOnly = utilities.removeTimeFromDatetime(stringDateTime: date)
             
             if(status == "approved"){
                 cell.lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
             }
+            else if(status == "processing"){
+                cell.lblStatus.backgroundColor = #colorLiteral(red: 1, green: 0.7450980392, blue: 0, alpha: 1)
+            }
+            else if(status == "delivery"){
+                cell.lblStatus.backgroundColor = #colorLiteral(red: 0.3568627451, green: 0.7529411765, blue: 0.8705882353, alpha: 1)
+            }
+            else if(status == "ready"){
+                cell.lblStatus.backgroundColor = #colorLiteral(red: 0.1058823529, green: 0.737254902, blue: 0.6078431373, alpha: 1)
+            }
+            else if(status == "picked_up"){
+                status = "Picked-Up"
+                cell.lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
+            }
             else if(status == "denied"){
                 cell.lblStatus.backgroundColor = UIColor.red
             }
             else{
-                cell.lblStatus.backgroundColor = #colorLiteral(red: 1, green: 0.7450980392, blue: 0, alpha: 1)
+                 cell.lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)
             }
             
             cell.imgHistory.image   = UIImage(named: "plc_\(gender)")
@@ -121,9 +161,9 @@ class PremiereHistoryController: UIViewController,UITableViewDelegate,UITableVie
         }
         else{
             let date     = arrayRequest[indexPath.row].created_at
-            let remarks  = arrayRequest[indexPath.row].remarks! ?? "None"
-            let message  = arrayRequest[indexPath.row].message! ?? "None"
-            let status   = arrayRequest[indexPath.row].status! ?? "None"
+            let remarks  = arrayRequest[indexPath.row].remarks ?? "None"
+            let message  = arrayRequest[indexPath.row].message ?? "None"
+            let status   = arrayRequest[indexPath.row].status ?? "None"
             
             if(status == "approved"){
                 cell.lblStatus.backgroundColor = #colorLiteral(red: 0.5725490196, green: 0.7803921569, blue: 0.2509803922, alpha: 1)

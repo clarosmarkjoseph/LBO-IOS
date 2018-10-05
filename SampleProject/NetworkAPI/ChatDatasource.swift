@@ -34,13 +34,10 @@ class ChatDatasource{
             let userToken       = utilities.getUserToken()
             let stringURL       = "\(SERVER_URL)/api/mobile/getAllChatMessage?token=\(userToken)"
             let myURL           = URL(string: stringURL)
-            
             let requestParams   = [
                 "arrayThreadID":"\(arrayThreadID)",
                 "arrayLastID":"\(arrayChatID)"
             ]
-            
-            print("Parameters: \(requestParams)")
             
             Alamofire.request(myURL!, method: .post, parameters: requestParams)
                 .responseJSON { response in
@@ -54,6 +51,14 @@ class ChatDatasource{
                                 let jsonResult          = try JSONDecoder().decode(ChatResult.self, from: responseJSONData)
                                 arrayChatThread = jsonResult.allMessage!
                                 completionBlock(arrayChatThread, statusCode)
+                            }
+                            else if (statusCode == 401){
+                                self.utilities.deleteAllData()
+                                let mainStoryboard: UIStoryboard = UIStoryboard(name: "LoginStoryboard", bundle: nil)
+                                let viewController = mainStoryboard.instantiateViewController(withIdentifier: "LoginController") as! LoginController
+                                viewController.isLoggedOut      = true
+                                viewController.sessionExpired   = true
+                                UIApplication.shared.keyWindow?.rootViewController = viewController
                             }
                             else{
                                 let responseValue = response.result.value
@@ -82,6 +87,7 @@ class ChatDatasource{
             completionBlock(arrayChatThread,0)
         }
     }
+   
    
     
    

@@ -95,7 +95,49 @@ class DatabaseHelper{
     let appointment_object          = Expression<String>("appointment_object")
     let appointment_date            = Expression<String>("appointment_date")
     let appointment_updated         = Expression<String>("appointment_updated")
+        
+    //chat thread table
+    let chat_thread_tbl             = Table("chat_thread_tbl")
+    var thread_id                   = Expression<Int>("thread_id")
+    let thread_creator_id           = Expression<Int>("thread_creator_id")
+    let thread_is_seen              = Expression<Int>("thread_is_seen")
+    let thread_is_block             = Expression<Int>("thread_is_block")
+    let thread_name                 = Expression<String>("thread_name")
+    let thread_datetime             = Expression<String>("thread_datetime")
+    let thread_user_image           = Expression<String>("thread_user_image")
+    let thread_participants         = Expression<String>("thread_participants")
+
     
+    //chat table
+    let chat_tbl                    = Table("chat_tbl")
+    let chat_id                     = Expression<Int>("chat_id")
+    let chat_sender_id              = Expression<Int>("chat_sender_id")
+    let chat_recipient_id           = Expression<Int>("chat_recipient_id")
+    let chat_title                  = Expression<String>("chat_title")
+    let chat_body                   = Expression<String>("chat_body")
+    let chat_data                   = Expression<String>("chat_data")
+    let chat_datetime               = Expression<Date>("chat_datetime")
+    let chat_status                 = Expression<String>("chat_status")
+    var chat_thread_id              = Expression<Int>("chat_thread_id")
+    let chat_read_at                = Expression<String>("chat_is_read")
+    
+    //device token for APN's
+    let device_token_tbl           = Table("device_token_tbl")
+    let device_token               = Expression<String>("device_token")
+    
+    //device token for APN's
+    let branch_rating_tbl          = Table("branch_rating_tbl")
+    let branch_rating_id           = Expression<Int>("branch_rating_id")
+    
+    //notification
+    let notification_tbl          = Table("notification_tbl")
+    let notification_id           = Expression<Int>("notification_id")
+    let notification_datetime     = Expression<String>("notification_datetime")
+    let notification_type         = Expression<String>("notification_type")
+    let notification_is_seen      = Expression<Int>("notification_is_seen")
+    let notification_title        = Expression<String>("notification_title")
+    let notification_body         = Expression<String>("notification_body")
+    let notification_unique_id    = Expression<Int>("notification_unique_id")
     
     //initialize database table
     public init(){
@@ -192,6 +234,46 @@ class DatabaseHelper{
                 table.column(appointment_date)
                 table.column(appointment_updated)
             })
+           
+            try db!.run(chat_thread_tbl.create(ifNotExists: true) { table in
+                table.column(thread_id)
+                table.column(thread_creator_id)
+                table.column(thread_name)
+                table.column(thread_datetime)
+                table.column(thread_is_seen)
+                table.column(thread_participants)
+                table.column(thread_is_block)
+                table.column(thread_user_image)
+            })
+            try db!.run(chat_tbl.create(ifNotExists: true) { table in
+                table.column(chat_id)
+                table.column(chat_sender_id)
+                table.column(chat_recipient_id)
+                table.column(chat_title)
+                table.column(chat_body)
+                table.column(chat_data)
+                table.column(chat_datetime)
+                table.column(chat_read_at)
+                table.column(chat_status)
+                table.column(chat_thread_id)
+            })
+            try db!.run(device_token_tbl.create(ifNotExists: true) { table in
+                table.column(device_token)
+            })
+            
+            try db!.run(branch_rating_tbl.create(ifNotExists: true) { table in
+                table.column(branch_rating_id)
+            })
+           
+            try db!.run(notification_tbl.create(ifNotExists: true) { table in
+                table.column(notification_id)
+                table.column(notification_datetime)
+                table.column(notification_type)
+                table.column(notification_is_seen)
+                table.column(notification_title)
+                table.column(notification_body)
+                table.column(notification_unique_id)
+            })
             
         }
         catch{
@@ -233,6 +315,35 @@ class DatabaseHelper{
         }
     }
     
+    func deleteUserAccount(){
+        do{
+            try db!.run(user_tbl.delete())
+        }
+        catch{
+            print("ERROR deleting User account")
+        }
+    }
+    
+    func deleteAppointments(){
+        do{
+            try db!.run(appointment_tbl.delete())
+        }
+        catch{
+            print("ERROR deleting Appointment")
+        }
+    }
+    
+    func deletePremier(){
+        do{
+            try db!.run(premiere_tbl.delete())
+        }
+        catch{
+            print("ERROR deleting Appointment")
+        }
+    }
+    
+    
+    
     func countUserAccount() -> Int{
         var countUser = 0
         do{
@@ -245,20 +356,20 @@ class DatabaseHelper{
         }
     }
     func insertUserAccount(id:Int,name:String,email:String,token:String,object_data:Dictionary<String,Any>,date_updated:String){
-       do{
-        //convert Dictionary to String
-        let jsonData            = try? JSONSerialization.data(withJSONObject: object_data, options:[])
-        guard let jsonString    = try String(data: jsonData!, encoding: .utf8) else { return }
-        let insertUser = user_tbl.insert(
-                    user_id             <- id,
-                    user_name           <- name,
-                    user_email          <- email,
-                    user_token          <- token,
-                    user_object_data    <- jsonString,
-                    user_date_updated   <- date_updated
-        
-                )
-            try db!.run(insertUser)
+    
+        do{
+            let jsonData            = try? JSONSerialization.data(withJSONObject: object_data, options:[])
+            guard let jsonString    = try String(data: jsonData!, encoding: .utf8) else { return }
+            let insertUser = user_tbl.insert(
+                        user_id             <- id,
+                        user_name           <- name,
+                        user_email          <- email,
+                        user_token          <- token,
+                        user_object_data    <- jsonString,
+                        user_date_updated   <- date_updated
+            
+                    )
+                try db!.run(insertUser)
        }
        catch{
             print("ERROR Inserting USER account")
@@ -266,12 +377,13 @@ class DatabaseHelper{
     }
     
     func updateUserProfile(id:Int,name:String,token:String,object_data:String,date_updated:String){
+        
         do{
-            let updateUser = user_tbl.update(
-                user_name         <- name,
-                user_token        <- token,
-                user_object_data  <- object_data,
-                user_date_updated <- date_updated
+            let updateUser          = user_tbl.update(
+                    user_name         <- name,
+                    user_token        <- token,
+                    user_object_data  <- object_data,
+                    user_date_updated <- date_updated
             )
             try db!.run(updateUser)
         }
@@ -281,6 +393,7 @@ class DatabaseHelper{
     }
     
     func updateUserObject(jsonString:String,date_updated:String){
+
         do{
             let updateUser = user_tbl.update(
                         user_object_data    <- jsonString,
@@ -295,15 +408,6 @@ class DatabaseHelper{
     
     
     
-    
-    func deleteBranches(){
-        do{
-            try db!.run(branch_tbl.delete())
-        }
-        catch{
-            print("ERROR DELETE BRANCH : \(error)")
-        }
-    }
     func deleteServices(){
         do{
             try db!.run(service_tbl.delete())
@@ -358,6 +462,29 @@ class DatabaseHelper{
             print("ERROR inserting Branches \(error)")
         }
     }
+    func returnBranches() -> String{
+        var returnString = "[]"
+        do{
+            if let queryStatement           = try db?.pluck(branch_tbl) {
+                returnString                = queryStatement[branch_array]
+                return returnString
+            }
+        }
+        catch{
+            print("ERROR Returning value: \(error)")
+            return returnString
+        }
+        return returnString
+    }
+    
+    func deleteBranches(){
+        do{
+            try db!.run(branch_tbl.delete())
+        }
+        catch{
+            print("ERROR DELETE BRANCH : \(error)")
+        }
+    }
     func insertServices(insert_version:Double,insert_array:String){
         do{
             let insertServices = service_tbl.insert(service_version  <- insert_version,service_array <- insert_array )
@@ -397,8 +524,10 @@ class DatabaseHelper{
         }
     }
     func insertCarousel(version_no:Double,arrayCarousel:String){
+        let utilities = Utilities()
         do{
-            let insertCarousel = carousel_tbl.insert(carousel_version  <- version_no, carousel_array <- arrayCarousel, carousel_date_added <- "")
+            let currentDate     = utilities.getCurrentDateTime(ifDateOrTime: "datetime")
+            let insertCarousel  = carousel_tbl.insert(carousel_version  <- version_no, carousel_array <- arrayCarousel, carousel_date_added <- currentDate)
             try db!.run(insertCarousel)
             print("Success inserting Carousel")
         }
@@ -597,10 +726,11 @@ class DatabaseHelper{
     
     //Promotions
     func insertPromotion(arrayString:String,date_updated:String){
+        let utilities = Utilities()
         do{
             let insertPremiere = promotion_tbl.insert(
                 promotion_array          <- arrayString,
-                promotion_date_updated  <- date_updated
+                promotion_date_updated   <- date_updated
             )
             try db!.run(insertPremiere)
             print("Success insert Promotions")
@@ -612,6 +742,7 @@ class DatabaseHelper{
     }
     
     func updatePromotion(arrayString:String,date_updated:String){
+        let utilities = Utilities()
         do{
             let updatePremiere = promotion_tbl.update(
                 promotion_array             <- arrayString,
@@ -708,23 +839,11 @@ class DatabaseHelper{
     
     
     //appointment
-    func countUserAccount() -> Int{
-        var countUser = 0
-        do{
-            countUser = try db!.scalar(user_tbl.count)
-            return countUser
-        }
-        catch{
-            print("ERROR Inserting USER account")
-            return countUser
-        }
-    }
-  
     func insertOrUpdateAppointment(id:Int,status:String,objectData:String,date:String,date_updated:String){
         do{
             let filterUpdate = appointment_tbl.filter(appointment_id == id)
             let countData    = try db!.scalar(filterUpdate.count)
-            if try countData  > 0 {
+            if countData  > 0 {
                 let updateQuery = filterUpdate.update(
                     appointment_status      <- status,
                     appointment_object      <- objectData,
@@ -750,6 +869,28 @@ class DatabaseHelper{
         }
     }
     
+    func getAppointmentString(unique_id:Int) -> String{
+        
+        var returnAppointment = "{}"
+        print("id get: \(unique_id)")
+        do{
+            let filterUpdate = appointment_tbl.filter(appointment_id == unique_id)
+            let query        = try db!.pluck(filterUpdate)
+            let countQuery   = try db!.scalar(filterUpdate.count)
+            if(countQuery <= 0){
+                return returnAppointment
+            }
+            else{
+                returnAppointment = query![appointment_object]
+                return returnAppointment
+            }
+        }
+        catch{
+            print("ERROR appointment Date: \(error)")
+        }
+        return returnAppointment
+    }
+    
     func deleteAppointment(id:Int){
         do{
             let statement = appointment_tbl.filter(appointment_id == id)
@@ -759,46 +900,582 @@ class DatabaseHelper{
             print("ERROR Delete Appointment \(error)")
         }
     }
+
     
-    func returnAppointment(id:Int)->String{
-        var returnString = "[]"
-        if(id <= 0){
-            let query = appointment_tbl.select(appointment_object)
-                .order(appointment_date.desc)
-            returnString = String(describing: query)
-            print(String(describing: query))
-            return returnString
+    //chat thread CRUD
+  
+    
+    
+    func updateIfUserIsBlocked(thread_id:Int){
+        do{
+            let filterUpdate = chat_thread_tbl.filter(chat_thread_id == thread_id)
+            let updateQuery  = filterUpdate.update(
+                thread_is_block      <- 1
+            )
+            try db!.run(updateQuery)
+            print("Success updating Chat blocked")
         }
-        else{
-            let query = appointment_tbl.select(appointment_object)
-                .filter(appointment_id == id)
-                .order(appointment_date.desc)
-            returnString = String(describing: query)
-            print(String(describing: query))
-            return returnString
+        catch{
+            print("Error update block user: \(error)")
         }
-        return returnString
     }
     
-    func returnAppointmentByStatus(status:String)->String{
-        var returnString = "{}"
-        let query = appointment_tbl.select(appointment_object)
-            .filter(appointment_status == status)
-            .order(appointment_date.desc)
-        returnString = String(describing: query)
-        print(String(describing: query))
-        return returnString
+    func updateIfUserMessageIsSeen(thread_id:Int){
+        do{
+            let filterUpdate = chat_thread_tbl.filter(chat_thread_id == thread_id)
+            let updateQuery  = filterUpdate.update(
+                thread_is_seen      <- 1
+            )
+            try db!.run(updateQuery)
+            print("Success updating Chat thread if seen")
+        }
+        catch{
+             print("Error update CHAT THREAD SEEN: \(error)")
+        }
+    }
+   
+    func deleteChatThread(){
+        do{
+            try db!.run(chat_thread_tbl.delete())
+        }
+        catch{
+            print("ERROR Delete Chat thread \(error)")
+        }
+    }
+    
+    func returnAllChatThread() -> Dictionary<String,Any>{
+        
+        var arrayThread  = [Int]()
+        var arrayChat    = [Int]()
+        var objectDetails   = Dictionary<String,Any>()
+      
+        do{
+            let query = try db!.prepare(self.chat_thread_tbl)
+            let countData = try db!.scalar(self.chat_thread_tbl.count)
+            print("Count Thread: \(countData)")
+            
+            for rows in query {
+                let res_thread_id       = try rows.get(thread_id)
+                let whereClause          = chat_tbl.where(chat_thread_id == res_thread_id)
+                                                .where(chat_status == "sent")
+                                                .order(chat_datetime.desc)
+                                                .limit(1)
+                let queryLastChat       = try db!.pluck(whereClause)
+                let chatID              = try queryLastChat?.get(chat_id)
+                arrayThread.append(res_thread_id)
+                arrayChat.append(chatID!)
+                print("thread_id & last chat ID: \(res_thread_id) - \(chatID)")
+            }
+            
+            objectDetails["arrayThreadID"] = arrayThread
+            objectDetails["arrayLastID"]   = arrayChat
+            return objectDetails
+        }
+        catch{
+            print("ERROR Retrieving chat: \(error)")
+        }
+        objectDetails["arrayThread"] = arrayThread
+        objectDetails["arrayChatID"] = arrayChat
+        return objectDetails
+    }
+    
+    func countMessage()->Int{
+        var countAll = 0
+        do{
+            let whereClause     = chat_thread_tbl.where(thread_is_seen == 0)
+            countAll            = try db!.scalar(whereClause.count)
+            return countAll
+        }
+        catch{
+            print("ERROR Retrieving chat: \(error)")
+        }
+        return countAll
     }
     
     
-   
+    //chat tbl CRUD
+    func insertOrUpdateChat(chatID:Int,chatSenderID:Int,chatReceiverID:Int,chatThreadID:Int,chatTitle:String,chatBody:String,chatMessageData:String,dateTime:String,chatIsRead:String,chatStatus:String){
+        
+        let utilities           = Utilities()
+        do{
+            let convertedDateTime = utilities.convertStringToDateTime(stringDate: dateTime)
+            let whereClause     = chat_tbl.filter(chat_id == chatID)
+            let countData       = try db!.scalar(whereClause.count)
+            if countData  > 0 {
+                let updateQuery = whereClause.update(
+                    self.chat_title         <- chatTitle,
+                    self.chat_body          <- chatBody,
+                    self.chat_data          <- chatMessageData,
+                    self.chat_read_at       <- chatIsRead,
+                    self.chat_status        <- chatStatus,
+                    self.chat_datetime      <- convertedDateTime
+                )
+                try db!.run(updateQuery)
+                print("Success updating Chat message")
+            }
+            else{
+                let insertChat = chat_tbl.insert(
+                    chat_id                 <- chatID,
+                    chat_sender_id          <- chatSenderID,
+                    chat_recipient_id       <- chatReceiverID,
+                    chat_thread_id          <- chatThreadID,
+                    chat_title              <- chatTitle,
+                    chat_body               <- chatBody,
+                    chat_data               <- chatMessageData,
+                    chat_datetime           <- convertedDateTime,
+                    chat_read_at            <- chatIsRead,
+                    chat_status             <- chatStatus
+                )
+                try db!.run(insertChat)
+                print("Success inserting Chat message")
+            }
+        }
+        catch{
+            print("ERROR INSERTING CHAT: \(error)")
+        }
+    }
+    
+    func insertOrUpdateThread(id:Int,name:String,dateTime:String,creator_id:Int,chat_participants_id:String,user_image:String){
+        
+        do{
+            let whereClause     = chat_thread_tbl.filter(self.thread_id == id)
+            let countData       = try db!.scalar(whereClause.count)
+            if countData  > 0 {
+                let updateQuery = whereClause.update(
+                    self.thread_name           <- name,
+                    self.thread_datetime       <- dateTime,
+                    self.thread_user_image     <- user_image,
+                    self.thread_is_seen        <- 0
+                )
+                try db!.run(updateQuery)
+                print("Success updating Chat thread")
+            }
+            else{
+                let insertQuery = chat_thread_tbl.insert(
+                    self.thread_id               <- id,
+                    self.thread_name             <- name,
+                    self.thread_datetime         <- dateTime,
+                    self.thread_is_seen          <- 0,
+                    self.thread_participants     <- chat_participants_id,
+                    self.thread_creator_id       <- creator_id,
+                    self.thread_is_block         <- 0,
+                    self.thread_user_image       <- user_image
+                )
+                try db!.run(insertQuery)
+            }
+        }
+        catch{
+            print("ERROR updating Chat thread: \(error)")
+        }
+    }
+    
+//    func updateThreadTime(dateTime:String,thread_id:Int,isRead:Int){
+//        do{
+//            let filterUpdate = chat_thread_tbl.filter(chat_thread_id == thread_id)
+//            let updateQuery  = filterUpdate.update(
+//                thread_datetime      <- dateTime
+//            )
+//            try db!.run(updateQuery)
+//            print("Success updating Chat thread time")
+//        }
+//        catch{
+//            print("Error update CHAT THREAD TIME: \(error)")
+//        }
+//    }
+    func updateThreadTime(threadID:Int,datetime:String,isRead:Int){
+        
+        do{
+            let whereClause     = chat_thread_tbl.filter(thread_id == threadID)
+            let updateQuery     = whereClause.update(
+                self.thread_datetime       <- datetime,
+                self.thread_is_seen        <- isRead
+                
+            )
+            try db!.run(updateQuery)
+        }
+        catch{
+            print("Error update CHAT THREAD TIME: \(error)")
+        }
+    }
+    
+    func markMessageAsSeen(threadID:Int,message_id:Int){
+        
+        let utilities   = Utilities()
+        let currentDate = utilities.getCurrentDateTime(ifDateOrTime: "datetime")
+        do{
+            let filterUpdate = chat_tbl.where(chat_read_at == "")
+                                        .where(chat_recipient_id == user_id)
+                                        .where(chat_id == message_id)
+            let updateQuery  = filterUpdate.update(
+                chat_read_at      <- currentDate
+            )
+            try db!.run(updateQuery)
+           
+        }
+        catch{
+            print("Error  updating Chat if seen: \(error)")
+        }
+    }
+    
+    func markThreadAsSeen(threadID:Int){
+        
+        let utilities   = Utilities()
+        do{
+            let filterThread = chat_thread_tbl.filter(thread_id == threadID)
+            let updateThread  = filterThread.update(
+                thread_is_seen      <- 1
+            )
+            try db!.run(updateThread)
+        }
+        catch{
+            print("Error  updating Chat if seen: \(error)")
+        }
+    }
+    
+    
+    
+    func deleteChatMessage(){
+        do{
+            //            let statement = chat_thread_tbl.filter(appointment_id == id)
+            try db!.run(chat_tbl.delete())
+        }
+        catch{
+            print("ERROR Delete Chat message: \(error)")
+        }
+    }
+    
+    func deleteSpecificChatMessage(chatID:Int){
+        do{
+            let statement = chat_tbl.where(chat_id == chatID)
+            try db!.run(statement.delete())
+        }
+        catch{
+            print("ERROR Delete Chat message: \(error)")
+        }
+    }
+    
+    func returnArrayChatThread() -> [ArrayChatThread]{
+        
+        let utilities           = Utilities()
+        var arrayChatThread     = [ArrayChatThread]()
+        do{
+            let query        = try db!.prepare(chat_thread_tbl)
+            for rows in query {
+                
+                var objectRows          = Dictionary<String,Any>()
+                let thread_id           = try rows.get(self.thread_id)
+                let thread_name         = try rows.get(self.thread_name)
+                let thread_image        = try rows.get(self.thread_user_image)
+                let thread_datetime     = try rows.get(self.thread_datetime)
+                let thread_participants = try rows.get(self.thread_participants)
+                let thread_creator_id   = try rows.get(self.thread_creator_id)
+                let thread_is_block     = try rows.get(self.thread_is_block)
+                
+                let participants_data   = thread_participants.data(using: .utf8)
+                let participant_ids     = try JSONDecoder().decode([Int].self, from: participants_data!)
+                let chatArray           = self.returnChat(chat_thread_id: thread_id)
+
+                objectRows["id"]                = thread_id
+                objectRows["participant_ids"]   = participant_ids
+                objectRows["created_by_id"]     = thread_creator_id
+                objectRows["created_at"]        = thread_datetime
+                objectRows["updated_at"]        = thread_datetime
+                objectRows["thread_name"]       = thread_name
+                objectRows["user_image"]        = thread_image
+                
+                let jsonString              = utilities.convertDictionaryToJSONString(dictionaryVal: objectRows)
+                let jsonData                = jsonString.data(using: .utf8)
+                var jsonDecodedThread       = try JSONDecoder().decode(ArrayChatThread.self, from: jsonData!)
+                jsonDecodedThread.messages  = chatArray
+                arrayChatThread.append(jsonDecodedThread)
+                
+            }
+            return arrayChatThread
+        }
+        catch{
+            print("ERROR returning chat thread: \(error)")
+        }
+        return arrayChatThread
+    }
+    
+    func returnNotifications() -> String{
+        var stringReturn        = ""
+        var arrayNotification   = [Dictionary<String,Any>]()
+        do{
+            let query        = try db!.prepare(notification_tbl)
+            for rows in query {
+                
+                let id                  = rows[notification_id]
+                let datetime            = rows[notification_datetime]
+                let title               = rows[notification_title]
+                let body                = rows[notification_body]
+                let unique_id           = rows[notification_unique_id]
+                let isRead              = rows[notification_is_seen]
+                let type                = rows[notification_type]
+                
+                var objectData           = Dictionary<String,Any>()
+                objectData["title"]      = title
+                objectData["body"]       = body
+                objectData["unique_id"]  = unique_id
+                
+                
+                
+                var objectNotification   = Dictionary<String,Any>()
+                objectNotification["id"]                    = id
+                objectNotification["notification_type"]     = type
+                objectNotification["created_at"] = datetime
+                objectNotification["isRead"] = isRead
+                objectNotification["notification_data"] = objectData
+                arrayNotification.append(objectNotification)
+            }
+            stringReturn = Utilities().convertJSONArrayToString(objectParse: arrayNotification)
+            return stringReturn
+        }
+        catch{
+            print("ERROR returning notifications: \(error)")
+        }
+        return stringReturn
+    }
+    
+    func returnChatThread(threadID:Int) -> [ArrayChatThread]{
+        let utilities           = Utilities()
+        var arrayChatThread     = [ArrayChatThread]()
+        do{
+            let whereClause         = self.chat_thread_tbl.where(self.thread_id == threadID)
+            let queryLastChat       = try db!.pluck(whereClause)
+            
+            var objectRows          = Dictionary<String,Any>()
+            let thread_id           = try queryLastChat?.get(self.thread_id)
+            let thread_name         = try queryLastChat?.get(self.thread_name)
+            let thread_image        = try queryLastChat?.get(self.thread_user_image)
+            let thread_datetime     = try queryLastChat?.get(self.thread_datetime)
+            let thread_participants = try queryLastChat?.get(self.thread_participants)
+            let thread_creator_id   = try queryLastChat?.get(self.thread_creator_id)
+            let thread_is_block     = try queryLastChat?.get(self.thread_is_block)
+            
+            let participants_data   = thread_participants?.data(using: .utf8)
+            let participant_ids     = try JSONDecoder().decode([Int].self, from: participants_data!)
+            let chatArray           = self.returnChat(chat_thread_id: thread_id!)
+            
+            objectRows["id"]                = thread_id
+            objectRows["participant_ids"]   = participant_ids
+            objectRows["created_by_id"]     = thread_creator_id
+            objectRows["created_at"]        = thread_datetime
+            objectRows["updated_at"]        = thread_datetime
+            objectRows["thread_name"]       = thread_name
+            objectRows["user_image"]        = thread_image
+            
+            let jsonString              = utilities.convertDictionaryToJSONString(dictionaryVal: objectRows)
+            let jsonData                = jsonString.data(using: .utf8)
+            var jsonDecodedThread       = try JSONDecoder().decode(ArrayChatThread.self, from: jsonData!)
+            jsonDecodedThread.messages  = chatArray
+            arrayChatThread.append(jsonDecodedThread)
+            
+            return arrayChatThread
+        }
+        catch{
+            print("ERROR returning chat thread: \(error)")
+        }
+        return arrayChatThread
+    }
     
    
     
+    func returnChat(chat_thread_id:Int) -> [ArrayChatMessage]{
+        
+        let utilities     = Utilities()
+        var arrayMessages = [ArrayChatMessage]()
+        do{
+            let whereClause  = chat_tbl.where(self.chat_thread_id == chat_thread_id)
+                                        .where(self.chat_title == "")
+            let query        = try db!.prepare(whereClause)
+            for rows in query {
+                var objectRows          = Dictionary<String,Any>()
+                let chat_id             = try rows.get(self.chat_id)
+                let chat_thread_id      = try rows.get(self.chat_thread_id)
+                let chat_sender_id      = try rows.get(self.chat_sender_id)
+                let chat_recipient_id   = try rows.get(self.chat_recipient_id)
+                let chat_title          = try rows.get(self.chat_title)
+                let chat_body           = try rows.get(self.chat_body)
+                let chat_data           = try rows.get(self.chat_data)
+                let chat_datetime       = utilities.convertDateTimeToString(date: (try rows.get(self.chat_datetime)))
+                let chat_read_at        = try rows.get(self.chat_read_at)
+                let chat_status         = try rows.get(self.chat_status)
+                let is_closed           = 0
+                let is_deleted          = 0
+              
+                objectRows["id"]                = chat_id
+                objectRows["sender_id"]         = chat_sender_id
+                objectRows["recipient_id"]      = chat_recipient_id
+                objectRows["message_thread_id"] = chat_thread_id
+                objectRows["is_closed"]         = is_closed
+                objectRows["title"]             = chat_title
+                objectRows["body"]              = chat_body
+                objectRows["message_data"]      = chat_data
+                objectRows["read_at"]           = chat_read_at
+                objectRows["created_at"]        = chat_datetime
+                objectRows["updated_at"]        = chat_datetime
+                objectRows["deleted_to_id"]     = is_deleted
+                objectRows["status"]            = chat_status
+                
+                let jsonStringThread            = utilities.convertDictionaryToJSONString(dictionaryVal: objectRows)
+                let jsonDataThread              = jsonStringThread.data(using: .utf8)
+                let jsonDecodedThread           = try JSONDecoder().decode(ArrayChatMessage.self, from: jsonDataThread!)
+                arrayMessages.append(jsonDecodedThread)
+            }
+            return arrayMessages
+        }
+        catch{
+            print("ERROR returning chat message: \(error)")
+        }
+        return arrayMessages
+    }
+    
+    
+    func insertDeviceToken(deviceToken:String){
+        
+        do{
+            let insertQuery = device_token_tbl.insert(
+                self.device_token <- deviceToken
+            )
+            try db!.run(insertQuery)
+        }
+        catch{
+             print("ERROR Inserting DeviceToken: \(error)")
+        }
+    }
+    
+    func returnDeviceToken() ->String{
+        do{
+            if let queryToken = try db!.pluck(device_token_tbl){
+                return queryToken[device_token]
+            }
+        }
+        catch{
+            print("error retrieving logs")
+        }
+        return ""
+    }
+    
+    func deleteDeviceToken(){
+        do{
+            try db!.run(device_token_tbl.delete())
+        }
+        catch{
+            print("ERROR deleting DeviceToken: \(error)")
+        }
+    }
+    
+    func insertBranchRating(review_id:Int){
+        do{
+            let insertQuery = branch_rating_tbl.insert(
+                self.branch_rating_id <- review_id
+            )
+            try db!.run(insertQuery)
+        }
+        catch{
+            print("ERROR Inserting BRanch rating: \(error)")
+        }
+    }
 
-
-
+    func returnBranchRating() -> Int{
+        var review_id = 0
+        do{
+            if let queryRating = try db!.pluck(branch_rating_tbl){
+                review_id = queryRating[branch_rating_id]
+                return review_id
+            }
+        }
+        catch{
+            print("error retrieving BRanch rating")
+        }
+        return review_id
+    }
+    
+    func deleteBranchRating(){
+        do{
+            try db!.run(branch_rating_tbl.delete())
+        }
+        catch{
+            print("ERROR deleting BRanch rating: \(error)")
+        }
+    }
+    
+    func deleteSpecificBranchRating(review_id:Int){
+        do{
+            let filterUpdate = appointment_tbl.filter(branch_rating_id == review_id)
+            try db!.run(filterUpdate.delete())
+        }
+        catch{
+            print("ERROR deleting BRanch rating: \(error)")
+        }
+    }
    
+    
+    func insertNotification(id:Int,datetime:String,type:String,is_seen:Int,title:String,body:String,unique_id:Int){
+        do{
+            let insertQuery = notification_tbl.insert(
+                self.notification_id          <- id,
+                self.notification_datetime    <- datetime,
+                self.notification_type        <- type,
+                self.notification_is_seen     <- is_seen,
+                self.notification_title       <- title,
+                self.notification_body        <- body,
+                self.notification_unique_id   <- unique_id
+            )
+            try db!.run(insertQuery)
+        }
+        catch{
+            print("error inserting Notifications: \(error)")
+        }
+    }
+    
+    func updateNotificationAsSeen(id:Int){
+        do{
+            let whereClause     = notification_tbl.filter(self.notification_id == id)
+            let updateQuery     = whereClause.update(
+                self.notification_is_seen           <- 1
+            )
+            try db!.run(updateQuery)
+        }
+        catch{
+            print("error updating as seen Notifications: \(error)")
+        }
+    }
+    
+    func countNotifications() -> Int{
+        var countUnseen = 0
+        do{
+            let whereClause = notification_tbl.filter(self.notification_is_seen == 0)
+            countUnseen     = try db!.scalar(whereClause.count)
+            return countUnseen
+        }
+        catch{
+            print("error retrieving notification: \(error)")
+        }
+        return countUnseen
+    }
+    
+    func getLastNotificationID() -> Int{
+        var notificationID = 0
+        do{
+            let whereClause = notification_tbl.order(notification_id.desc)
+            let query       = try db!.pluck(whereClause)
+            if let queryStatement           = try db?.pluck(whereClause) {
+                notificationID  = queryStatement[notification_id]
+            }
+            return notificationID
+        }
+        catch{
+            print("error retrieving notification: \(error)")
+        }
+        return notificationID
+        
+    }
+    
+    
+
+    
     
     
     
