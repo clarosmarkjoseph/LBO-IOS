@@ -19,5 +19,6 @@ DerivedData
 *.xcworkspace
 !default.xcworkspace
 New Certificates
+GoogleService-Info (1)
 #CocoaPods
 Pods
