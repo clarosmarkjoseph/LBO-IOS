@@ -1,2 +1,2 @@
 # Lay-Bare-IOS
-This is a official mobile application of LB created by me
+This is a official IOS application of LB created by me
